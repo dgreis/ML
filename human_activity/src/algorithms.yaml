@@ -1,0 +1,17 @@
+Algorithms:
+
+  Base Multinomial Classifier (All Feats):
+    base_algorithm: Multinomial_Classifier
+    keyword_arg_settings:
+        multi_class: "multinomial"
+    feature_settings:
+        exclusion_patterns: None
+
+  Base Multinomial Classifier (Exclude Test):
+      base_algorithm: Multinomial_Classifier
+      keyword_arg_settings:
+          multi_class: "multinomial"
+      feature_settings:
+          exclusion_patterns:
+            - fBodyGyro-bandsEnergy
+

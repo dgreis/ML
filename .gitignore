@@ -1,0 +1,6 @@
+.idea/
+*.csv
+*.txt
+*.DS_Store
+*.names
+*.zip
