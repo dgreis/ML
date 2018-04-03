@@ -1,2 +1,8 @@
 repo_loc: "/Users/davidgreis/Documents/Personal/Data_Projects/ML"
 current_project: "human_activity"
+
+model_facet_defaults:
+    keyword_arg_settings : {}
+    feature_settings:
+        exclusion_patterns: None
+

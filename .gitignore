@@ -1,4 +1,5 @@
 .idea/
+*.pyc
 *.csv
 *.txt
 *.DS_Store
