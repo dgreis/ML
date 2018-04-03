@@ -5,38 +5,41 @@ import pandas as pd
 
 global_settings = yaml.load(open('./global_settings.yaml'))
 
-def find_data_dir(global_settings,project_settings):
-    repo_loc = global_settings['repo_loc']
+def find_data_dir(project_settings):
+    repo_loc = project_settings['repo_loc']
     project_dir = project_settings['project_name']
     rel_data_dir = project_settings['data_dir']
     abs_data_dir = repo_loc + '/' + project_dir + '/' + rel_data_dir
     return abs_data_dir
 
-def load_project_settings(global_settings):
+def configure_project_settings(global_settings):
     repo_loc = global_settings['repo_loc']
     project_dir = repo_loc + '/' + global_settings['current_project']
     project_settings_loc = project_dir + '/src/project_settings.yaml'
-    return yaml.load(open(project_settings_loc))
+    settings_update = yaml.load(open(project_settings_loc))
+    project_settings = global_settings.copy()
+    project_settings.update(settings_update)
+    return project_settings
 
-def load_model_configs(global_settings):
-    repo_loc = global_settings['repo_loc']
-    project_dir = repo_loc + '/' + global_settings['current_project']
+def load_model_configs(project_settings):
+    repo_loc = project_settings['repo_loc']
+    project_dir = repo_loc + '/' + project_settings['current_project']
     model_configs_loc = project_dir + '/src/models.yaml'
     raw_model_configs = yaml.load(open(model_configs_loc))
-    model_configs = set_default_configs_if_missing(raw_model_configs,global_settings)
+    model_configs = set_default_configs_if_missing(raw_model_configs, project_settings)
     return model_configs
 
-def set_default_configs_if_missing(model_configs, global_settings):
+def set_default_configs_if_missing(model_configs, project_settings):
     for model_name in model_configs['Models']:
-        for facet in global_settings['model_facet_defaults']:
+        for facet in project_settings['model_facet_defaults']:
             if not model_configs['Models'][model_name].has_key(facet):
-                model_configs[model_name][facet] = global_settings['model_facet_defaults'][facet]
+                model_configs[model_name][facet] = project_settings['model_facet_defaults'][facet]
     return model_configs
 
-def configure_models(algorithm_config, project_settings):
+def configure_models(model_config, project_settings):
     ml_problem_type = project_settings['ml_problem_type']
     ml_module = importlib.import_module('algorithms.' + ml_problem_type )
-    models = algorithm_config['Models']
+    models = model_config['Models']
     algos = dict()
     for model_name in models:
         algo_class = getattr(ml_module,models[model_name]['base_algorithm'])
@@ -54,7 +57,7 @@ def prepare_final_model_dataset(model_config, project_settings):
 
     X_mats = {x: final_files[x] for x in ['X_train','X_test']}
 
-    data_dir = find_data_dir(global_settings, project_settings)
+    data_dir = find_data_dir(project_settings)
 
     feature_settings = model_config['feature_settings']
 
@@ -80,8 +83,8 @@ def prepare_final_model_dataset(model_config, project_settings):
     return data
 
 
-def all_final_files_exist(project_settings,global_settings):
-    data_dir = find_data_dir(global_settings,project_settings)
+def all_final_files_exist(project_settings):
+    data_dir = find_data_dir(project_settings)
     rel_filepaths = project_settings['final_files']
     abs_filepaths = [data_dir + '/' + fp for fp in rel_filepaths]
     for fp in abs_filepaths:

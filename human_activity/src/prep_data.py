@@ -2,18 +2,18 @@ import yaml
 import pandas as pd
 import os
 
-from utils import find_data_dir, load_column_map
+from utils import find_data_dir, configure_project_settings
 
 #TODO: import this logic into main ML script?
 
 global_settings = yaml.load(open('./global_settings.yaml'))
-project_settings = yaml.load(open('./' + global_settings['current_project'] + '/src/project_settings.yaml'))
+project_settings = configure_project_settings(global_settings)
 
 #TODO: clean up stupid duplicated columns in this dataset
 
 def main():
 
-    data_dir = find_data_dir(global_settings,project_settings)
+    data_dir = find_data_dir(project_settings)
     processed_dir = data_dir + '/processed'
     if not os.path.isdir(processed_dir):
         os.makedirs(processed_dir)
