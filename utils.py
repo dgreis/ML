@@ -73,7 +73,9 @@ def prepare_final_model_dataset(model_config, project_settings):
     y_mats = {y: final_files[y] for y in ['y_train','y_test']}
 
     for mat_name in y_mats:
-        data[mat_name] = final_files[mat_name]
+        y_mat_file_path = data_dir + '/' + final_files[mat_name]
+        y_mat = pd.read_csv(y_mat_file_path,sep="\s+",engine='python',header=None)
+        data[mat_name] = y_mat.iloc[:,0].tolist()
 
     return data
 
