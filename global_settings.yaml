@@ -6,3 +6,34 @@ model_facet_defaults:
     feature_settings:
         exclusion_patterns: None
 
+module_map:
+  multiclass-classification: 'classification'
+  binary-classification: 'classfication'
+  regression: 'regression'
+
+metrics:
+  classification:
+    binary:
+      - precision_recall_curve
+      - roc_curve
+    multiclass:
+        standard_keyword_args:
+          average: 'weighted'
+        battery:
+          confusion_matrix:
+            metric_type: matrix
+            kwargs: {}
+          accuracy_score:
+            metric_type: column
+            kwargs: {}
+          classification_report:
+            metric_type: unknown
+            kwargs: {}
+          f1_score:
+            metric_type: column
+          recall_score:
+            metric_type: column
+          precision_score:
+            metric_type: column
+
+

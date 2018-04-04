@@ -1,6 +1,6 @@
 
 project_name : "human_activity"
-ml_problem_type: 'classification'
+ml_problem_type: 'multiclass-classification'
 data_dir : "data/UCI HAR Dataset"
 #parse_sep : "'\s+"
 parse_engine: "python"

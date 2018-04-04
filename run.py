@@ -3,6 +3,7 @@ import os
 import importlib
 
 from utils import *
+from evaluation import *
 
 global_settings = yaml.load(open('./global_settings.yaml'))
 project_settings = configure_project_settings(global_settings)
@@ -28,7 +29,12 @@ for model_name in models:
     print 'Model Fit. \nStep Three: Perform Model Evaluation'
     X_test, y_test = data['X_test'], data['y_test']
     y_pred = model.predict(X_test)
-    #evaluation_metrics = load_evaluation_metrics(project_settings)
+    evaluation_battery = load_evaluation_battery(project_settings)
+    report = dict()
+    for metric_name in evaluation_battery:
+        metric_class = evaluation_battery[metric_name]['class']
+        kwargs = evaluation_battery[metric_name]['kwargs']
+        report[metric_name] = metric_class(y_pred, y_test,**kwargs)
     i += 1
 
 #m.label(y)

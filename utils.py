@@ -3,7 +3,6 @@ import yaml
 import os
 import pandas as pd
 
-global_settings = yaml.load(open('./global_settings.yaml'))
 
 def find_data_dir(project_settings):
     repo_loc = project_settings['repo_loc']
@@ -16,10 +15,19 @@ def configure_project_settings(global_settings):
     repo_loc = global_settings['repo_loc']
     project_dir = repo_loc + '/' + global_settings['current_project']
     project_settings_loc = project_dir + '/src/project_settings.yaml'
-    settings_update = yaml.load(open(project_settings_loc))
-    project_settings = global_settings.copy()
-    project_settings.update(settings_update)
-    return project_settings
+    project_settings = yaml.load(open(project_settings_loc))
+    ml_problem_type = project_settings['ml_problem_type']
+    if 'classification' in ml_problem_type:
+        classification_type = ml_problem_type.split('-')[0]
+        metrics_pak = global_settings['metrics']['classification'][classification_type]
+        battery = metrics_pak['battery']
+        for metric in battery:
+            if not battery[metric].has_key('kwargs'):
+                battery[metric]['kwargs'] = metrics_pak['standard_keyword_args']
+    new_settings = global_settings.copy()
+    new_settings.update(project_settings)
+    return new_settings
+
 
 def load_model_configs(project_settings):
     repo_loc = project_settings['repo_loc']
@@ -38,7 +46,8 @@ def set_default_configs_if_missing(model_configs, project_settings):
 
 def configure_models(model_config, project_settings):
     ml_problem_type = project_settings['ml_problem_type']
-    ml_module = importlib.import_module('algorithms.' + ml_problem_type )
+    module_map = project_settings['module_map']
+    ml_module = importlib.import_module('algorithms.' + module_map[ml_problem_type])
     models = model_config['Models']
     algos = dict()
     for model_name in models:
@@ -111,8 +120,6 @@ def filter_columns(X_mat,feature_settings,inv_column_map):
         exclude_indices = [int(inv_column_map[col_name]) for col_name in exclude_columns]
         X_mat_filt = X_mat.drop(axis=1,labels=exclude_indices)
     return X_mat_filt
-
-
             
 
 
