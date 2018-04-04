@@ -17,17 +17,19 @@ def configure_project_settings(global_settings):
     project_settings_loc = project_dir + '/src/project_settings.yaml'
     project_settings = yaml.load(open(project_settings_loc))
     ml_problem_type = project_settings['ml_problem_type']
-    if 'classification' in ml_problem_type:
-        classification_type = ml_problem_type.split('-')[0]
-        metrics_pak = global_settings['metrics']['classification'][classification_type]
-        battery = metrics_pak['battery']
-        for metric in battery:
-            if not battery[metric].has_key('kwargs'):
-                battery[metric]['kwargs'] = metrics_pak['standard_keyword_args']
+    eval_pak = global_settings['metrics'][ml_problem_type]
+    battery = eval_pak['battery']
+    for metric in battery:
+        if not battery[metric].has_key('kwargs'):
+            battery[metric]['kwargs'] = eval_pak['standard_keyword_args']
     new_settings = global_settings.copy()
     new_settings.update(project_settings)
     return new_settings
 
+def fetch_eval_pak(project_settings):
+    ml_problem_type = project_settings['ml_problem_type']
+    eval_pak = project_settings['metrics'][ml_problem_type]
+    return eval_pak
 
 def load_model_configs(project_settings):
     repo_loc = project_settings['repo_loc']

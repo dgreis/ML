@@ -12,22 +12,21 @@ module_map:
   regression: 'regression'
 
 metrics:
-  classification:
-    binary:
+  binary-classification:
       - precision_recall_curve
       - roc_curve
-    multiclass:
+  multiclass-classification:
         standard_keyword_args:
           average: 'weighted'
         battery:
           confusion_matrix:
-            metric_type: matrix
+            metric_type: array
             kwargs: {}
           accuracy_score:
             metric_type: column
             kwargs: {}
           classification_report:
-            metric_type: unknown
+            metric_type: text
             kwargs: {}
           f1_score:
             metric_type: column
