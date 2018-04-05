@@ -1,5 +1,6 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble.forest import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
@@ -29,3 +30,8 @@ class Gaussian_Naive_Bayes_Classifier(GaussianNB):
 
     def __init__(self,**kwargs):
         GaussianNB.__init__(self,**kwargs)
+
+class Gradient_Boosting_Classifier(GradientBoostingClassifier):
+
+    def __init__(self,**kwargs):
+        GradientBoostingClassifier.__init__(self,**kwargs)
