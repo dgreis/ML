@@ -5,6 +5,7 @@ model_facet_defaults:
     keyword_arg_settings : {}
     feature_settings:
         exclusion_patterns: None
+    cross_validation_settings: None
 
 module_map:
   multiclass-classification: 'classification'

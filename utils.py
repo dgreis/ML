@@ -43,7 +43,11 @@ def set_default_configs_if_missing(model_configs, project_settings):
     for model_name in model_configs['Models']:
         for facet in project_settings['model_facet_defaults']:
             if not model_configs['Models'][model_name].has_key(facet):
-                model_configs[model_name][facet] = project_settings['model_facet_defaults'][facet]
+                default = project_settings['model_facet_defaults'][facet]
+                if type(default) == str:
+                    model_configs['Models'][model_name][facet] = eval(default)
+                else:
+                    model_configs['Models'][model_name][facet] = default
     return model_configs
 
 def configure_models(model_config, project_settings):
@@ -58,7 +62,6 @@ def configure_models(model_config, project_settings):
         algo_instance = algo_class(**kwargs)
         algos[model_name] = algo_instance
     return algos
-
 
 def prepare_final_model_dataset(model_config, project_settings):
     '''This presumes X_train, y_train, X_test, and y_test already exist. This

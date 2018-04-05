@@ -25,7 +25,7 @@ class Report:
             entries = self.entries
             column_entries = {k: v for k, v in entries.iteritems() if eval_pak['battery'][k]['metric_type'] == 'column'}
             column_table = pd.DataFrame(column_entries)
-            column_table_html = column_table.to_html()
+            column_table_html = column_table.T.to_html()
             f.write('<h1>Overall</h1>')
             f.write(column_table_html)
             array_entries = {k: v for k, v in entries.iteritems() if eval_pak['battery'][k]['metric_type'] == 'array'}
