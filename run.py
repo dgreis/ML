@@ -26,8 +26,8 @@ for model_name in models:
     print "\nFitting model (" + str(i) + "/" + str(num_models) + "): " + model_name +'. \nFirst Step: Finalize dataset'
     model_config = model_configs['Models'][model_name]
     data = prepare_final_model_dataset(model_config, project_settings)
-    print "Data Finalized"
-    X_train, y_train  = data['X_train'], data['y_train']
+    X_train, y_train, X_test, y_test = data['X_train'], data['y_train'], data['X_test'], data['y_test']
+    print "Data Finalized. Training data with " + str(len(X_train)) + " samples. Test data with " + str(len(X_test)) + " samples"
     model = models[model_name]
     if model_config['cross_validation_settings'] != None:
         validator = Cross_Validator(model_config)
@@ -36,7 +36,6 @@ for model_name in models:
     print "Next Step: Fit Model"
     model.fit(X_train,y_train)
     print 'Model Fit. \nNext Step: Perform Model Evaluation'
-    X_test, y_test = data['X_test'], data['y_test']
     y_pred = model.predict(X_test)
     evaluation_battery = load_evaluation_battery(project_settings)
     for metric_name in evaluation_battery:
