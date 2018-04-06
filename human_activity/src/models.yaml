@@ -20,10 +20,12 @@ Models:
           feature_selection:
             - exclusion_patterns:
                 - fBodyGyro-bandsEnergy
-            #- lasso:
-            #    options:
-            #      option1: value
-            #      option2: value
+            - l1_based:
+                method: "LinearSVC"
+                kwargs:
+                  C : 0.01
+                  dual : False
+            #     option2: value
             #- univariate:
             #    options:
             #      option1: value

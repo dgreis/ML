@@ -29,6 +29,7 @@ def main():
     for model_name in models:
         print "\nFitting model (" + str(i) + "/" + str(num_models) + "): " + model_name +'. \nFirst Step: Finalize dataset'
         model_config = model_configs['Models'][model_name]
+        model_config['model_name'] = model_name
         data = prepare_final_model_dataset(model_config, project_settings)
         X_train, y_train, X_test, y_test = data['X_train'], data['y_train'], data['X_test'], data['y_test']
         print "Data Finalized. Training data with " + str(len(X_train)) + " samples. Test data with " + str(len(X_test)) + " samples"
