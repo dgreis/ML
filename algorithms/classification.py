@@ -1,6 +1,7 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble.forest import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import BaggingClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
@@ -35,3 +36,9 @@ class Gradient_Boosting_Classifier(GradientBoostingClassifier):
 
     def __init__(self,**kwargs):
         GradientBoostingClassifier.__init__(self,**kwargs)
+
+class Bagged_SVM_Classifier(BaggingClassifier):
+
+    def __init__(self,**kwargs):
+        BaggingClassifier.__init__(self,base_estimator=Basic_SVM_Classifier(**{'C':10}),
+                                   **kwargs)
