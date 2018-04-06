@@ -17,16 +17,22 @@ Models:
           solver: "lbfgs"
           penalty: "l2"
       feature_settings:
-          exclusion_patterns:
-            - fBodyGyro-bandsEnergy
-      cross_validation_settings:
-          hyper_params:
-            C : "[0.1, 1, 10]"
-          strategy: "Grid"
-          num_folds: 5
-          eval_metric:
-            name: "precision_score"
-            kwargs: { "average" : "weighted" }
+          feature_selection:
+            - exclusion_patterns:
+                - fBodyGyro-bandsEnergy
+            #- lasso:
+            #    options:
+            #      option1: value
+            #      option2: value
+            #- univariate:
+            #    options:
+            #      option1: value
+            #      option2: value
+          feature_engineering:
+              post_selection: True
+              engineering_1:
+                name: basis_expansion
+                columns: column1
 
   #Random_Forest:
   #    base_algorithm: Random_Forest_Classifier
@@ -34,14 +40,7 @@ Models:
   #Neural_Network:
   #    base_algorithm: MultiLayer_Perceptron_NN_Classifier
 
-  SVC:
-      base_algorithm: Basic_SVM_Classifier
 
-  SVC with C=10:
-      base_algorithm: Basic_SVM_Classifier
-      keyword_arg_settings:
-          C: 10
-          
   #SVC with CV:
   #    base_algorithm: Basic_SVM_Classifier
   #    cross_validation_settings:

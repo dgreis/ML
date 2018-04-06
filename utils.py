@@ -1,7 +1,6 @@
 import importlib
 import yaml
 import os
-import pandas as pd
 
 
 def find_data_dir(project_settings):
@@ -63,39 +62,6 @@ def configure_models(model_config, project_settings):
         algos[model_name] = algo_instance
     return algos
 
-def prepare_final_model_dataset(model_config, project_settings):
-    '''This presumes X_train, y_train, X_test, and y_test already exist. This
-    method is meant to augment or exclude the base features'''
-
-    final_files = project_settings['final_files']
-
-    X_mats = {x: final_files[x] for x in ['X_train','X_test']}
-
-    data_dir = find_data_dir(project_settings)
-
-    feature_settings = model_config['feature_settings']
-
-    column_names_filepath = data_dir + '/' + project_settings['final_files']['feature_names']
-    inv_column_map = load_column_map(column_names_filepath)
-
-    data = dict()
-
-    for mat_name in X_mats:
-        abs_X_filepath = data_dir + '/' + X_mats[mat_name]
-        X_mat = pd.read_csv(abs_X_filepath,sep="\s+",engine='python',header=None) #TODO: This isn't parsing correctly again. Also yaml issue
-        X_mat_filt = filter_columns(X_mat,feature_settings,inv_column_map)
-        X_mat_transform = transform_columns(X_mat_filt,feature_settings)
-        data[mat_name] = X_mat_transform
-
-    y_mats = {y: final_files[y] for y in ['y_train','y_test']}
-
-    for mat_name in y_mats:
-        y_mat_file_path = data_dir + '/' + final_files[mat_name]
-        y_mat = pd.read_csv(y_mat_file_path,sep="\s+",engine='python',header=None)
-        data[mat_name] = y_mat.iloc[:,0].tolist()
-
-    return data
-
 
 def all_final_files_exist(project_settings):
     data_dir = find_data_dir(project_settings)
@@ -106,25 +72,9 @@ def all_final_files_exist(project_settings):
             return False
     return True
 
-def load_column_map(filepath):
-    df = pd.read_csv(filepath,sep="\s+",engine='python',names=['col_name'])
-    return pd.Series(df.index,index=df.col_name).to_dict()
 
 def transform_columns(X_mat,feature_settings):
-    return X_mat
-
-def filter_columns(X_mat,feature_settings,inv_column_map):
-    if feature_settings['exclusion_patterns'] == 'None':
-        return X_mat
-    else:
-        exclude_columns = list()
-        col_names = inv_column_map.keys()
-        for pattern in feature_settings['exclusion_patterns']:
-            pat_exclude_columns = filter(lambda x: pattern in x, col_names)
-            exclude_columns = exclude_columns + pat_exclude_columns
-        exclude_indices = [int(inv_column_map[col_name]) for col_name in exclude_columns]
-        X_mat_filt = X_mat.drop(axis=1,labels=exclude_indices)
-    return X_mat_filt
+    raise NotImplementedError
             
 
 

@@ -11,4 +11,4 @@ final_files:
   y_train : "train/y_train.txt"
   X_test : "test/x_test.txt"
   y_test : "test/y_test.txt"
-  feature_names: "processed/features.txt"
+  feature_names: "processed/feature.txt"

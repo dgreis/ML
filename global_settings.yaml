@@ -4,7 +4,10 @@ current_project: "human_activity"
 model_facet_defaults:
     keyword_arg_settings : {}
     feature_settings:
-        exclusion_patterns: None
+        feature_engineering:
+          post_selection: False
+        feature_selection: None
+
     cross_validation_settings: None
 
 module_map:
