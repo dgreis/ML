@@ -4,12 +4,8 @@ import os
 
 from utils import find_data_dir, configure_project_settings
 
-#TODO: import this logic into main ML script?
-
 global_settings = yaml.load(open('./global_settings.yaml'))
 project_settings = configure_project_settings(global_settings)
-
-#TODO: clean up stupid duplicated columns in this dataset
 
 def main():
 

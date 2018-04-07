@@ -71,7 +71,7 @@ class Manipulator:
         pass
 
     def _set_working_features(self, col_map):
-        self.working_features = col_map #TODO: Fix broken filter, which puts this in as a list of indices
+        self.working_features = col_map
 
     def _output_features(self,feature_version):
         model_config = self.model_config

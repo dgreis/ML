@@ -2,7 +2,7 @@ import importlib
 
 import pandas as pd
 
-from manager import Manipulator
+from manipulator import Manipulator
 from sklearn.preprocessing import PolynomialFeatures
 
 class TransformChain(Manipulator):
@@ -113,8 +113,8 @@ class basis_expansion(Transform):
         for i in range(num_poly_features):
             #base_feature_name = col_map[ind]
             #poly_feature_name = base_feature_name + '**' + str(i+1)
-            poly_feature_name = 'polyfeature..' + str(i)  ##TODO: Make this name meaningful
-            Xt_feat_names.append(poly_feature_name)
+            poly_feature_name = 'polyfeature..' + str(i)  ##TODO: Make this name meaningful. Note this won't filter properly
+            Xt_feat_names.append(poly_feature_name)       ## using exclusion_patterns
         assert len(Xt_feat_names) == Xt_df.shape[1]
         untouched_indices = Xut_df.columns.tolist()
         new_col_map = dict()

@@ -2,7 +2,7 @@ import pandas as pd
 import importlib
 import inspect
 
-from manager import Manipulator
+from manipulator import Manipulator
 
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
@@ -20,7 +20,7 @@ class FilterChain(Manipulator):
         selection_module = importlib.import_module('feature.selection')
         filters = self.filters
         model_config = self.model_config
-        self._pass_y_train_to_fm(y_train)
+        self._pass_y_train_to_fc(y_train)
         X_filt = X_train
         orig_inv_col_map = self.inv_column_map
         orig_col_map = {v: k for k, v in orig_inv_col_map.iteritems()}
@@ -52,7 +52,7 @@ class FilterChain(Manipulator):
             self._update_working_data_feature_names_ref('selected-features')
         return X_filt
 
-    def _pass_y_train_to_fm(self,y_train):
+    def _pass_y_train_to_fc(self, y_train):
         self.y_train = y_train
 
     def _get_args(self,filter_class):

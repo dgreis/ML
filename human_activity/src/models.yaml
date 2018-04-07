@@ -18,19 +18,19 @@ Models:
           penalty: "l2"
       feature_settings:
           feature_selection:
-            - exclusion_patterns:
-                - fBodyGyro-bandsEnergy
+          #  - exclusion_patterns:
+          #      - fBodyGyro-bandsEnergy
             - l1_based:
                 method: "LinearSVC"
                 kwargs:
                   C : 0.01
                   dual : False
-          feature_engineering:
-            - basis_expansion:
-                inclusion_patterns:
-                    - fBodyGyro-bandsEnergy
-                kwargs:
-                  degree: 2
+          #feature_engineering:
+          #  - basis_expansion:
+          #      inclusion_patterns:
+          #          - fBodyGyro-bandsEnergy
+          #      kwargs:
+          #        degree: 2
 
   #Random_Forest:
   #    base_algorithm: Random_Forest_Classifier
