@@ -4,9 +4,9 @@ current_project: "human_activity"
 model_facet_defaults:
     keyword_arg_settings : {}
     feature_settings:
-        feature_engineering:
-          post_selection: False
-        feature_selection: None
+        feature_engineering: []
+        eng_post_selection: False
+        feature_selection: []
 
     cross_validation_settings: None
 

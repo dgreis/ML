@@ -25,16 +25,13 @@ Models:
                 kwargs:
                   C : 0.01
                   dual : False
-            #     option2: value
-            #- univariate:
-            #    options:
-            #      option1: value
-            #      option2: value
           feature_engineering:
-              post_selection: True
-              engineering_1:
-                name: basis_expansion
-                columns: column1
+            - basis_expansion:
+                inclusion_patterns:
+                    - tBodyAcc-max()
+                kwargs:
+                  degree: 2
+          eng_post_selection: True
 
   #Random_Forest:
   #    base_algorithm: Random_Forest_Classifier

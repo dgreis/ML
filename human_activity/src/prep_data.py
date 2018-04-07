@@ -18,7 +18,7 @@ def main():
     if not os.path.isdir(processed_dir):
         os.makedirs(processed_dir)
 
-    raw_files = project_settings['raw_files']
+    raw_files = project_settings['preprocessed_input_files']
 
     ##Remove duplicate columns or alter their names
     column_names_filepath = data_dir + '/' + raw_files['feature_names']
@@ -30,8 +30,8 @@ def main():
     )
 
 
-    feature_name_filepath = data_dir + '/' + project_settings['final_files']['feature_names']
+    feature_name_filepath = data_dir + '/' + project_settings['clean_input_files']['feature_names']
     feat_df.sort_values('file_index',inplace=True)
-    feat_df[['new_feature_name']].to_csv(feature_name_filepath,index=False,header=False)
+    feat_df[['new_feature_name']].to_csv(feature_name_filepath,index=False,header=False,quoting=False,sep="\t")
 
 

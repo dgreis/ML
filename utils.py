@@ -1,14 +1,21 @@
 import importlib
 import yaml
 import os
+import operator as op
 
 
 def find_data_dir(project_settings):
     repo_loc = project_settings['repo_loc']
-    project_dir = project_settings['project_name']
+    rel_project_dir = project_settings['project_name']
     rel_data_dir = project_settings['data_dir']
-    abs_data_dir = repo_loc + '/' + project_dir + '/' + rel_data_dir
+    abs_data_dir = repo_loc + '/' + rel_project_dir + '/' + rel_data_dir
     return abs_data_dir
+
+def find_project_dir(project_settings):
+    repo_loc = project_settings['repo_loc']
+    rel_project_dir = project_settings['project_name']
+    abs_project_dir = repo_loc + '/' + rel_project_dir
+    return abs_project_dir
 
 def configure_project_settings(global_settings):
     repo_loc = global_settings['repo_loc']
@@ -47,6 +54,11 @@ def set_default_configs_if_missing(model_configs, project_settings):
                     model_configs['Models'][model_name][facet] = eval(default)
                 else:
                     model_configs['Models'][model_name][facet] = default
+            elif facet == 'feature_settings':
+                default_feature_settings = project_settings['model_facet_defaults']['feature_settings']
+                for sub_facet in default_feature_settings:
+                    if not model_configs['Models'][model_name]['feature_settings'].has_key(sub_facet):
+                        model_configs['Models'][model_name]['feature_settings'][sub_facet] = default_feature_settings[sub_facet]
     return model_configs
 
 def configure_models(model_config, project_settings):
@@ -63,9 +75,9 @@ def configure_models(model_config, project_settings):
     return algos
 
 
-def all_final_files_exist(project_settings):
+def all_clean_input_files_exist(project_settings):
     data_dir = find_data_dir(project_settings)
-    rel_filepaths = project_settings['final_files']
+    rel_filepaths = project_settings['clean_input_files']
     abs_filepaths = [data_dir + '/' + fp for fp in rel_filepaths]
     for fp in abs_filepaths:
         if not os.path.isfile(fp):
@@ -73,8 +85,10 @@ def all_final_files_exist(project_settings):
     return True
 
 
-def transform_columns(X_mat,feature_settings):
-    raise NotImplementedError
-            
+def ncr(n, r):
+    r = min(r, n-r)
+    numer = reduce(op.mul, xrange(n, n-r, -1), 1)
+    denom = reduce(op.mul, xrange(1, r+1), 1)
+    return numer//denom
 
 
