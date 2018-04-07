@@ -28,10 +28,9 @@ Models:
           feature_engineering:
             - basis_expansion:
                 inclusion_patterns:
-                    - tBodyAcc-max()
+                    - fBodyGyro-bandsEnergy
                 kwargs:
                   degree: 2
-          eng_post_selection: True
 
   #Random_Forest:
   #    base_algorithm: Random_Forest_Classifier

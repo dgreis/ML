@@ -1,10 +1,74 @@
 import pandas as pd
+import importlib
+import inspect
+
+from manager import Manipulator
 
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import SelectFromModel
 
+class FilterChain(Manipulator):
+
+    def __init__(self,filters, model_config, project_settings,original_columns=False):
+        Manipulator.__init__(self, filters, model_config, project_settings,original_columns)
+        self.filters = filters
+
+    def fit_transform(self,X_train,y_train):
+        """To be fit method of filter_chain class"""
+        selection_module = importlib.import_module('feature.selection')
+        filters = self.filters
+        model_config = self.model_config
+        self._pass_y_train_to_fm(y_train)
+        X_filt = X_train
+        orig_inv_col_map = self.inv_column_map
+        orig_col_map = {v: k for k, v in orig_inv_col_map.iteritems()}
+        init_num_feats = len(X_train.columns)  #this might need to be changed when no longer pandas
+        i = 1
+        if len(filters) < 1:
+            pass
+        else:
+            for d in filters:
+                filter_name = d.keys()[0]
+                print "\t[Train] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
+                filter_class = getattr(selection_module,filter_name)
+                additional_args = self._get_args(filter_class)
+                filter = filter_class(model_config)
+                kwargs = dict()
+                for arg in additional_args:
+                    kwargs[arg] = getattr(self,arg)
+                X_filt = filter.apply(X_filt,**kwargs)
+                i += 1
+            working_features = self.working_features
+            if working_features == None:
+                working_features = orig_col_map
+            updated_col_map = {idx: working_features[idx] for idx in X_filt.columns.tolist()}
+            self._set_working_features(updated_col_map)
+            filt_num_feats = len(self.working_features)
+            print "\tAfter model selection, number of features now " + str(filt_num_feats) +", down from " + str(init_num_feats) +". " + \
+                "See project model_artifacts folder for more info."
+            self._output_features('selected-features')
+            self._update_working_data_feature_names_ref('selected-features')
+        return X_filt
+
+    def _pass_y_train_to_fm(self,y_train):
+        self.y_train = y_train
+
+    def _get_args(self,filter_class):
+        args = getattr(inspect.getargspec(filter_class.apply),'args')
+        additional_args = args[2:]
+        return additional_args
+
+    def transform(self, X_mat):
+        filters = self.filters
+        if len(filters) > 0:
+            working_features = self.working_features  # { ind : feat_name }
+            print "\t[Test] Filtering selected features"
+            X_filt = X_mat.iloc[:, working_features.keys()]
+            return X_filt
+        else:
+            return X_mat
 
 class Filter:
 

@@ -3,7 +3,8 @@ import yaml
 import os
 import importlib
 
-from feature.manager import FeatureManager
+from feature.engineering import TransformChain
+from feature.selection import FilterChain
 from utils import *
 from evaluation import *
 from cross_validation import *
@@ -17,7 +18,7 @@ def main():
     if not all_clean_input_files_exist(project_settings):
         prep_data = importlib.import_module(project_settings['project_name'] + '.src.' + 'prep_data')
         prep_data.main()
-    project_settings['working_files'] = project_settings['clean_input_files']
+    project_settings['working_files'] = project_settings['clean_input_files'].copy()
 
     model_configs = load_model_configs(project_settings)
     models = configure_models(model_configs, project_settings)
@@ -77,24 +78,24 @@ def prepare_final_model_dataset(model_config, project_settings):
     X_train_abs_filepath = data_dir + '/' + X_mat_rel_filepaths["X_train"]
     X_train = pd.read_csv(X_train_abs_filepath,sep="\s+",engine='python',header=None)
     y_train = data['y_train']
-    fm = FeatureManager(model_config, project_settings)
-    if fm.select_first == True:
-        X_train_1st = fm.select_features(X_train,y_train)
-        X_train_2nd = fm.engineer_features(X_train_1st)
-    else:
-        X_train_1st = fm.engineer_features(X_train)
-        X_train_2nd = fm.select_features(X_train_1st,y_train)
 
-    data['X_train'] = X_train_2nd
+    transformations = model_config['feature_settings']['feature_engineering']
+    X_train_trans = TransformChain(transformations, model_config, project_settings).fit_transform(X_train)
+
+    filters = model_config['feature_settings']['feature_selection']
+    fc = FilterChain(filters, model_config, project_settings)
+    X_train_filt = fc.fit_transform(X_train_trans,y_train)
+
+    data['X_train'] = X_train_filt
 
     X_test_abs_filepath = data_dir + '/' + X_mat_rel_filepaths["X_test"]
     X_test = pd.read_csv(X_test_abs_filepath,sep="\s+",engine='python',header=None)
-    X_test_1st = fm.engineer_features(X_test,train=False)
-    X_test_2nd = fm.filter_selected_features(X_test_1st)
+    X_test_trans = TransformChain(transformations,model_config,project_settings,original_columns=True).fit_transform(X_test,train=False)
+    X_test_filt = fc.transform(X_test_trans)
 
-    assert X_train_2nd.shape[1] == X_test_2nd.shape[1]
+    assert X_train_filt.shape[1] == X_test_filt.shape[1]
 
-    data['X_test'] = X_test_2nd
+    data['X_test'] = X_test_filt
 
     return data
 

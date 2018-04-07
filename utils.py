@@ -85,10 +85,3 @@ def all_clean_input_files_exist(project_settings):
     return True
 
 
-def ncr(n, r):
-    r = min(r, n-r)
-    numer = reduce(op.mul, xrange(n, n-r, -1), 1)
-    denom = reduce(op.mul, xrange(1, r+1), 1)
-    return numer//denom
-
-
