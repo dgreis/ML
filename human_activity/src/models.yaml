@@ -10,27 +10,32 @@ Models:
   #        - fBodyGyro-bandsEnergy
 
 
-  Base Multinomial Classifier (Exclude Test):
+  Base Multinomial Classifier (Normalized):
       base_algorithm: Multinomial_Classifier
       keyword_arg_settings:
           multi_class: "multinomial"
           solver: "lbfgs"
           penalty: "l2"
       feature_settings:
-          feature_selection:
+          #feature_selection:
           #  - exclusion_patterns:
           #      - fBodyGyro-bandsEnergy
-            - l1_based:
-                method: "LinearSVC"
-                kwargs:
-                  C : 0.01
-                  dual : False
-          #feature_engineering:
-          #  - basis_expansion:
-          #      inclusion_patterns:
-          #          - fBodyGyro-bandsEnergy
+          #  - l1_based:
+          #      method: "LinearSVC"
           #      kwargs:
-          #        degree: 2
+          #        C : 0.01
+          #        dual : False
+          feature_engineering:
+            - normalize:
+                inclusion_patterns:
+                    - fBodyGyro-bandsEnergy
+
+  Base Multinomial Classifier:
+    base_algorithm: Multinomial_Classifier
+    keyword_arg_settings:
+        multi_class: "multinomial"
+        solver: "lbfgs"
+        penalty: "l2"
 
   #Random_Forest:
   #    base_algorithm: Random_Forest_Classifier

@@ -4,6 +4,7 @@ import pandas as pd
 
 from manipulator import Manipulator
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import Normalizer
 
 class TransformChain(Manipulator):
 
@@ -47,13 +48,21 @@ class TransformChain(Manipulator):
 class Transform:
 
     def __init__(self,model_config):
-        self.feature_eng_settings = model_config['feature_settings']['feature_engineering']
-        self.inclusion_patterns = None
-        self.transform_indices = None
+        feature_eng_settings = model_config['feature_settings']['feature_engineering']
         self.base_transformer = None
+        self.configure_transform(feature_eng_settings)
 
-    def fetch_transform_settings(self,transform_name):
-        feature_eng_settings = self.feature_eng_settings
+    def configure_transform(self,feature_eng_settings):
+        transform_class = str(self.__class__).split('.')[-1:][0]
+        transform_settings = self.fetch_transform_settings(feature_eng_settings, transform_class)
+        if transform_settings.has_key('kwargs'):
+            kwargs = transform_settings['kwargs']
+        else:
+            kwargs = dict()
+        self.kwargs = kwargs
+        self.inclusion_patterns = transform_settings['inclusion_patterns']
+
+    def fetch_transform_settings(self,feature_eng_settings, transform_name):
         for item in feature_eng_settings:
             if item.keys()[0] == transform_name:
                 transform_settings = item[transform_name]
@@ -93,21 +102,42 @@ class Transform:
         return X_touched
 
     def combine_and_reindex(self, X_touched, X_untouched, col_map):
-        pass
+        Xt_df = pd.DataFrame(X_touched)
+        Xut_df = pd.DataFrame(X_untouched)
+        if type(X_touched) == None:
+            return X_untouched, col_map
+        else:
+            untouched_indices = Xut_df.columns.tolist()
+            new_col_map = dict()
+            ni = 0
+            for oi in untouched_indices:
+                col_name = col_map[oi]
+                new_col_map[ni] = col_name
+                ni += 1
+            Xut_df.columns = range(len(untouched_indices))
+            reindexed_col_idx = list()
+            Xt_feat_names = self.gen_new_column_names(Xt_df,col_map)
+            for feature in Xt_feat_names:
+                new_col_map[ni] = feature
+                reindexed_col_idx.append(ni)
+                ni += 1
+            Xt_df.columns = reindexed_col_idx
+            assert ni == len(Xt_feat_names) + len(untouched_indices)
+            X_transform = pd.merge(Xut_df, Xt_df, left_index=True, right_index=True)
+            assert ni == X_transform.shape[1]
+            assert len(X_transform) == len(Xut_df) == len(Xt_df)
+            return X_transform, new_col_map
 
+    def gen_new_column_names(self,Xt_df,col_map):
+        pass
 
 class basis_expansion(Transform):
 
     def __init__(self,model_config):
         Transform.__init__(self,model_config)
-        basis_expansion_settings = self.fetch_transform_settings('basis_expansion')
-        kwargs = basis_expansion_settings['kwargs']
-        self.set_base_transformer(PolynomialFeatures(**kwargs))
-        self.set_inclusion_patterns(basis_expansion_settings['inclusion_patterns'])
+        self.set_base_transformer(PolynomialFeatures(**self.kwargs))
 
-    def combine_and_reindex(self, X_touched, X_untouched, col_map):
-        Xt_df = pd.DataFrame(X_touched)
-        Xut_df = pd.DataFrame(X_untouched)
+    def gen_new_column_names(self, Xt_df):
         Xt_feat_names = list()
         num_poly_features = Xt_df.shape[1]
         for i in range(num_poly_features):
@@ -116,24 +146,19 @@ class basis_expansion(Transform):
             poly_feature_name = 'polyfeature..' + str(i)  ##TODO: Make this name meaningful. Note this won't filter properly
             Xt_feat_names.append(poly_feature_name)       ## using exclusion_patterns
         assert len(Xt_feat_names) == Xt_df.shape[1]
-        untouched_indices = Xut_df.columns.tolist()
-        new_col_map = dict()
-        ni = 0
-        for oi in untouched_indices:
-            col_name = col_map[oi]
-            new_col_map[ni] = col_name
-            ni += 1
-        Xut_df.columns = range(len(untouched_indices))
-        reindexed_col_idx = list()
-        for feature in Xt_feat_names:
-            new_col_map[ni] = feature
-            reindexed_col_idx.append(ni)
-            ni += 1
-        Xt_df.columns = reindexed_col_idx
-        assert ni == len(Xt_feat_names) + len(untouched_indices)
-        X_transform = pd.merge(Xut_df, Xt_df, left_index=True, right_index=True)
-        assert ni == X_transform.shape[1]
-        assert len(X_transform) == len(Xut_df) == len(Xt_df)
-        return X_transform, new_col_map
+        return Xt_feat_names
 
 
+class normalize(Transform):
+
+    def __init__(self,model_config):
+        Transform.__init__(self,model_config)
+        self.set_base_transformer(Normalizer(**self.kwargs))
+
+    def gen_new_column_names(self,Xt_df,col_map):
+        Xt_feat_names = list()
+        for idx in Xt_df.columns.tolist():
+            base_feature_name = col_map[idx]
+            norm_feature_name = 'norm(' + base_feature_name + ')'
+            Xt_feat_names.append(norm_feature_name)
+        return Xt_feat_names
