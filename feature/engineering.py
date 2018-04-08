@@ -5,6 +5,7 @@ import pandas as pd
 from manipulator import Manipulator
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
+from sklearn.decomposition import PCA
 
 class TransformChain(Manipulator):
 
@@ -33,10 +34,10 @@ class TransformChain(Manipulator):
                 print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
                     len(transformations)) + "): " + transform_name
                 transform_class = getattr(engineering_module, transform_name)
-                transform = transform_class(model_config)
-                X_touch, X_untouched = transform.split(X_mat, working_features)
-                X_touched = transform.fit(X_touch)
-                X_transform, updated_col_map = transform.combine_and_reindex(X_touched, X_untouched, working_features)
+                transformer = transform_class(model_config)
+                X_touch, X_untouched = transformer.split(X_mat, working_features)
+                X_touched = transformer.fit_transform(X_touch)
+                X_transform, updated_col_map = transformer.combine_and_reindex(X_touched, X_untouched, working_features)
                 self._set_working_features(updated_col_map)
                 if train == True:
                     self._output_features(transform_name)
@@ -83,10 +84,9 @@ class Transform:
         col_names = working_features.values()
         inclusion_patterns = self.inclusion_patterns
         inv_working_features = {v: k for k, v in working_features.iteritems()}
-        if inclusion_patterns == 'All':
-            X_untouched = None
+        if inclusion_patterns == ['All']:
+            X_untouched = pd.DataFrame(columns=col_indices)
             X_touch = X_mat
-            raise NotImplementedError
         else:
             for pattern in inclusion_patterns:
                 pat_include_columns = filter(lambda x: pattern in x, col_names)
@@ -97,15 +97,18 @@ class Transform:
             X_touch = X_mat.loc[:,touch_indices]
         return X_touch, X_untouched
 
-    def fit(self,X_touch):
+    def fit_transform(self,X_touch):
         X_touched = self.base_transformer.fit_transform(X_touch)
-        return X_touched
+        if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
+            return pd.DataFrame(X_touched)
+        else:
+            return X_touched
 
-    def combine_and_reindex(self, X_touched, X_untouched, col_map):
-        Xt_df = pd.DataFrame(X_touched)
-        Xut_df = pd.DataFrame(X_untouched)
-        if type(X_touched) == None:
-            return X_untouched, col_map
+    def combine_and_reindex(self, Xt_df, Xut_df, col_map):
+        Xt_df = pd.DataFrame(Xt_df)
+        Xut_df = pd.DataFrame(Xut_df)
+        if len(Xut_df) == 0:
+            return Xt_df, col_map
         else:
             untouched_indices = Xut_df.columns.tolist()
             new_col_map = dict()
@@ -162,3 +165,17 @@ class normalize(Transform):
             norm_feature_name = 'norm(' + base_feature_name + ')'
             Xt_feat_names.append(norm_feature_name)
         return Xt_feat_names
+
+class pca(Transform):
+
+    def __init__(self,model_config):
+        Transform.__init__(self,model_config)
+        self.set_base_transformer(PCA(**self.kwargs))
+
+    def gen_new_column_names(self,Xt_df,col_map):
+        num_comps = self.base_transformer.n_components
+        new_col_list = list()
+        for i in range(num_comps):
+            new_col_name = 'pc_' + str(i)
+            new_col_list.append(new_col_name)
+        return new_col_list
