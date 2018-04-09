@@ -17,13 +17,18 @@ Models:
         solver: "lbfgs"
         penalty: "l2"
     feature_settings:
+        select_before_eng: True
         feature_engineering:
           - pca:
               store_output: True
               inclusion_patterns:
                 - All
               kwargs:
-                n_components: 2
+                n_components: 3
+        feature_selection:
+            - exclusion_patterns:
+                - fBodyGyro-bandsEnergy
+
 
   #Random_Forest:
   #    base_algorithm: Random_Forest_Classifier

@@ -79,7 +79,7 @@ class Manipulator:
         model_file_name_prefix = slugify(model_name)
         artifact_dir = self.artifact_dir
         pd.Series(self.working_features).to_csv(artifact_dir + '/' + model_file_name_prefix + '-' + slugify(feature_version.replace('_','-')) + \
-                                                '.txt',index=False,sep='\t')
+                                                '-features.txt',index=False,sep='\t')
 
     def _update_working_data_feature_names_ref(self, feature_version):
         model_config = self.model_config
@@ -88,4 +88,4 @@ class Manipulator:
         artifact_dir = self.artifact_dir
         project_settings = self.project_settings
         project_settings['working_files']['feature_names'] = artifact_dir + '/' + model_file_name_prefix + \
-                                                             '-' + (feature_version.replace('_','-')) + '.txt'
+                                                             '-' + (feature_version.replace('_','-')) + '-features.txt'

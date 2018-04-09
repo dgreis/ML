@@ -5,7 +5,7 @@ model_facet_defaults:
     keyword_arg_settings : {}
     feature_settings:
         feature_engineering: []
-        eng_post_selection: False
+        select_before_eng: False
         feature_selection: []
 
     cross_validation_settings: None

@@ -46,8 +46,11 @@ class FilterChain(Manipulator):
             updated_col_map = {idx: working_features[idx] for idx in X_filt.columns.tolist()}
             self._set_working_features(updated_col_map)
             filt_num_feats = len(self.working_features)
-            print "\tAfter model selection, number of features now " + str(filt_num_feats) +", down from " + str(init_num_feats) +". " + \
-                "See project model_artifacts folder for more info."
+            if filt_num_feats < init_num_feats:
+                print "\t\tAfter model selection, number of features now " + str(filt_num_feats) +", down from " + str(init_num_feats) +". " + \
+                    "See project model_artifacts folder for more info."
+            else:
+                print "\t\tNo features elminated in model selection process"
             self._output_features('selected-features')
             self._update_working_data_feature_names_ref('selected-features')
         return X_filt
@@ -60,15 +63,26 @@ class FilterChain(Manipulator):
         additional_args = args[2:]
         return additional_args
 
-    def transform(self, X_mat):
+    def transform(self, X_mat,original_columns=False):
         filters = self.filters
         if len(filters) > 0:
-            working_features = self.working_features  # { ind : feat_name }
             print "\t[Test] Filtering selected features"
-            X_filt = X_mat.iloc[:, working_features.keys()]
-            return X_filt
+            working_features = self.working_features  # { ind : feat_name }
+            if not original_columns:
+                X_filt = X_mat.iloc[:, working_features.keys()]
+            else:
+                filt_indices = list()
+                inv_working_features = {v: k for k, v in working_features.iteritems()}
+                orig_inv_col_map = self.inv_column_map
+                for col in inv_working_features:
+                    if orig_inv_col_map.has_key(col):
+                        filt_indices.append(inv_working_features[col])
+                    else:
+                        pass
+                X_filt = X_mat.iloc[:,filt_indices]
         else:
-            return X_mat
+            X_filt = X_mat
+        return X_filt
 
 class Filter:
 

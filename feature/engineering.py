@@ -28,7 +28,7 @@ class TransformChain(Manipulator):
             X_transform = X_mat
         else:
             working_features = self.working_features
-            if working_features == None:
+            if working_features is None:
                 inv_column_map = self.inv_column_map
                 working_features = {v: k for k, v in inv_column_map.iteritems()}
             for d in transformations:
@@ -95,7 +95,7 @@ class Transformer:
         inclusion_patterns = self.inclusion_patterns
         inv_working_features = {v: k for k, v in working_features.iteritems()}
         if inclusion_patterns == ['All']:
-            X_untouched = pd.DataFrame(columns=col_indices)
+            X_untouched = pd.DataFrame()
             X_touch = X_mat
         else:
             for pattern in inclusion_patterns:
@@ -115,7 +115,7 @@ class Transformer:
             rdf = X_touched
         return rdf
 
-    def store_output(self,X_mat,output_dir):
+    def store_output(self,X_mat,output_dir): #TODO: When I need to output filter, make this an abstract method in new Manipulator class
         model_name = self.model_name
         transform_name = str(self.__class__).split('.')[-1:][0]
         output_file_name = slugify(model_name + '-' + transform_name)
@@ -124,29 +124,29 @@ class Transformer:
     def combine_and_reindex(self, Xt_df, Xut_df, col_map):
         Xt_df = pd.DataFrame(Xt_df)
         Xut_df = pd.DataFrame(Xut_df)
-        if len(Xut_df) == 0:
-            return Xt_df, col_map
-        else:
-            untouched_indices = Xut_df.columns.tolist()
-            new_col_map = dict()
-            ni = 0
-            for oi in untouched_indices:
-                col_name = col_map[oi]
-                new_col_map[ni] = col_name
-                ni += 1
-            Xut_df.columns = range(len(untouched_indices))
-            reindexed_col_idx = list()
-            Xt_feat_names = self.gen_new_column_names(Xt_df,col_map)
-            for feature in Xt_feat_names:
-                new_col_map[ni] = feature
-                reindexed_col_idx.append(ni)
-                ni += 1
-            Xt_df.columns = reindexed_col_idx
-            assert ni == len(Xt_feat_names) + len(untouched_indices)
+        Xt_feat_names = self.gen_new_column_names(Xt_df, col_map)
+        untouched_indices = Xut_df.columns.tolist()
+        new_col_map = dict()
+        ni = 0
+        for oi in untouched_indices:
+            col_name = col_map[oi]
+            new_col_map[ni] = col_name
+            ni += 1
+        Xut_df.columns = range(len(untouched_indices))
+        reindexed_col_idx = list()
+        for feature in Xt_feat_names:
+            new_col_map[ni] = feature
+            reindexed_col_idx.append(ni)
+            ni += 1
+        Xt_df.columns = reindexed_col_idx
+        assert ni == len(Xt_feat_names) + len(untouched_indices)
+        if len(Xut_df) > 0:
             X_transform = pd.merge(Xut_df, Xt_df, left_index=True, right_index=True)
-            assert ni == X_transform.shape[1]
             assert len(X_transform) == len(Xut_df) == len(Xt_df)
-            return X_transform, new_col_map
+        else:
+            X_transform = Xt_df
+        assert ni == X_transform.shape[1]
+        return X_transform, new_col_map
 
     def gen_new_column_names(self,Xt_df,col_map):
         pass

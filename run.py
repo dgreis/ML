@@ -80,22 +80,33 @@ def prepare_final_model_dataset(model_config, project_settings):
     y_train = data['y_train']
 
     transformations = model_config['feature_settings']['feature_engineering']
-    X_train_trans = TransformChain(transformations, model_config, project_settings).fit_transform(X_train)
-
     filters = model_config['feature_settings']['feature_selection']
-    fc = FilterChain(filters, model_config, project_settings)
-    X_train_filt = fc.fit_transform(X_train_trans,y_train)
 
-    data['X_train'] = X_train_filt
+    if model_config['feature_settings']['select_before_eng']:
+        fc = FilterChain(filters, model_config, project_settings)
+        X_train_1st = fc.fit_transform(X_train, y_train)
+        X_train_2nd = TransformChain(transformations, model_config, project_settings).fit_transform(X_train_1st)
+    else:
+        X_train_1st = TransformChain(transformations, model_config, project_settings).fit_transform(X_train)
+        fc = FilterChain(filters, model_config, project_settings)
+        X_train_2nd = fc.fit_transform(X_train_1st,y_train)
+
+    data['X_train'] = X_train_2nd
 
     X_test_abs_filepath = data_dir + '/' + X_mat_rel_filepaths["X_test"]
     X_test = pd.read_csv(X_test_abs_filepath,sep="\s+",engine='python',header=None)
-    X_test_trans = TransformChain(transformations,model_config,project_settings,original_columns=True).fit_transform(X_test,train=False)
-    X_test_filt = fc.transform(X_test_trans)
+    if model_config['feature_settings']['select_before_eng']:
+        X_test_1st = fc.transform(X_test,original_columns=True)
+        X_test_2nd = TransformChain(transformations,model_config,project_settings,
+                                    original_columns=True).fit_transform(X_test_1st,train=False)
+    else:
+        X_test_1st = TransformChain(transformations,model_config,project_settings,
+                                    original_columns=True).fit_transform(X_test,train=False)
+        X_test_2nd = fc.transform(X_test_1st)
 
-    assert X_train_filt.shape[1] == X_test_filt.shape[1]
+    assert X_train_2nd.shape[1] == X_test_2nd.shape[1]
 
-    data['X_test'] = X_test_filt
+    data['X_test'] = X_test_2nd
 
     return data
 
