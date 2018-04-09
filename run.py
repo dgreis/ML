@@ -16,7 +16,7 @@ project_settings = configure_project_settings(global_settings)
 
 def main():
     if not all_clean_input_files_exist(project_settings):
-        prep_data = importlib.import_module(project_settings['project_name'] + '.src.' + 'prep_data')
+        prep_data = importlib.import_module('projects.' + project_settings['project_name'] + '.src.' + 'prep_data')
         prep_data.main()
     project_settings['working_files'] = project_settings['clean_input_files'].copy()
 

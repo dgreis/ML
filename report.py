@@ -20,7 +20,8 @@ class Report:
 
     def write_report(self):
         project_settings = self.project_settings
-        eval_dir = project_settings['repo_loc'] + '/' + project_settings['project_name'] + '/evaluation'
+        abs_project_dir = find_project_dir(project_settings)
+        eval_dir = abs_project_dir + '/evaluation'
         if not os.path.isdir(eval_dir):
             os.makedirs(eval_dir)
         with open(eval_dir + '/report.html',"w") as f:

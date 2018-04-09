@@ -5,22 +5,21 @@ import operator as op
 
 
 def find_data_dir(project_settings):
-    repo_loc = project_settings['repo_loc']
-    rel_project_dir = project_settings['project_name']
+    abs_project_dir = find_project_dir(project_settings)
     rel_data_dir = project_settings['data_dir']
-    abs_data_dir = repo_loc + '/' + rel_project_dir + '/' + rel_data_dir
+    abs_data_dir = abs_project_dir + '/' + rel_data_dir
     return abs_data_dir
 
 def find_project_dir(project_settings):
     repo_loc = project_settings['repo_loc']
-    rel_project_dir = project_settings['project_name']
-    abs_project_dir = repo_loc + '/' + rel_project_dir
+    project_name = project_settings['project_name']
+    abs_project_dir = repo_loc + '/projects/' + project_name
     return abs_project_dir
 
 def configure_project_settings(global_settings):
     repo_loc = global_settings['repo_loc']
-    project_dir = repo_loc + '/' + global_settings['current_project']
-    project_settings_loc = project_dir + '/src/project_settings.yaml'
+    abs_project_dir = repo_loc + '/projects/' + global_settings['current_project']
+    project_settings_loc = abs_project_dir + '/src/project_settings.yaml'
     project_settings = yaml.load(open(project_settings_loc))
     ml_problem_type = project_settings['ml_problem_type']
     eval_pak = global_settings['metrics'][ml_problem_type]
@@ -38,9 +37,8 @@ def fetch_eval_pak(project_settings):
     return eval_pak
 
 def load_model_configs(project_settings):
-    repo_loc = project_settings['repo_loc']
-    project_dir = repo_loc + '/' + project_settings['current_project']
-    model_configs_loc = project_dir + '/src/models.yaml'
+    abs_project_dir = find_project_dir(project_settings)
+    model_configs_loc = abs_project_dir + '/src/models.yaml'
     raw_model_configs = yaml.load(open(model_configs_loc))
     model_configs = set_default_configs_if_missing(raw_model_configs, project_settings)
     return model_configs
