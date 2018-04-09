@@ -18,6 +18,7 @@ def main():
     if not all_clean_input_files_exist(project_settings):
         prep_data = importlib.import_module('projects.' + project_settings['project_name'] + '.src.' + 'prep_data')
         prep_data.main()
+        print "Data Built for project: " + global_settings['current_project']
     project_settings['working_files'] = project_settings['clean_input_files'].copy()
 
     model_configs = load_model_configs(project_settings)

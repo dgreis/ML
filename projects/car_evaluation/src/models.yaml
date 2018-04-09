@@ -1,0 +1,7 @@
+
+Models:
+  Base Multinomial Classifier (All Feats):
+    base_algorithm: Multinomial_Classifier
+    keyword_arg_settings:
+        multi_class: "multinomial"
+        solver: "lbfgs"
