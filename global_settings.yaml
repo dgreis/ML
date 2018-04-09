@@ -30,7 +30,7 @@ metrics:
             metric_type: column
             kwargs: {}
           classification_report:
-            metric_type: text
+            metric_type: classification_report
             kwargs: {}
           f1_score:
             metric_type: column

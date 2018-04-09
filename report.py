@@ -1,5 +1,6 @@
 import pandas as pd
 
+from collections import defaultdict
 from utils import *
 
 class Report:
@@ -40,15 +41,31 @@ class Report:
                     array_table = pd.DataFrame(array)
                     array_table_html = array_table.to_html()
                     f.write(array_table_html)
-            text_entries = {k: v for k, v in entries.iteritems() if eval_pak['battery'][k]['metric_type'] == 'text'}
-            for entry in text_entries:
+            cr_entries = {k: v for k, v in entries.iteritems() if eval_pak['battery'][k]['metric_type'] == 'classification_report'}
+            for entry in cr_entries:
                 f.write("<h1>" + entry + "</h1>")
-                models = text_entries[entry]
+                models = cr_entries[entry]
                 for name in models:
                     f.write("<h3>" + name + "</h3>")
-                    element_text = models[name]
-                    element_html = "<p>" + element_text + "</p>"
+                    element_table = self.create_cr_table(models[name])
+                    element_html = element_table.to_html()
                     f.write(element_html)
 
+    def create_cr_table(self,blob):
+        # Parse rows
+        tmp = list()
+        for row in blob.split("\n"):
+            parsed_row = [x for x in row.split("  ") if len(x) > 0]
+            if len(parsed_row) > 0:
+                tmp.append(parsed_row)
 
+        # Store in dictionary
+        measures = tmp[0]
+
+        D_class_data = defaultdict(dict)
+        for row in tmp[1:]:
+            class_label = row[0]
+            for j, m in enumerate(measures):
+                D_class_data[class_label][m.strip()] = float(row[j + 1].strip())
+        return pd.DataFrame(D_class_data).T
 
