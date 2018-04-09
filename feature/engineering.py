@@ -7,6 +7,8 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
 from sklearn.decomposition import PCA
 
+from django.utils.text import slugify
+
 class TransformChain(Manipulator):
 
     def __init__(self,transformations, model_config, project_settings,original_columns=False):
@@ -30,38 +32,46 @@ class TransformChain(Manipulator):
                 inv_column_map = self.inv_column_map
                 working_features = {v: k for k, v in inv_column_map.iteritems()}
             for d in transformations:
-                transform_name = d.keys()[0]
+                transformer_name = d.keys()[0]
                 print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
-                    len(transformations)) + "): " + transform_name
-                transform_class = getattr(engineering_module, transform_name)
+                    len(transformations)) + "): " + transformer_name
+                transform_class = getattr(engineering_module, transformer_name)
                 transformer = transform_class(model_config)
                 X_touch, X_untouched = transformer.split(X_mat, working_features)
                 X_touched = transformer.fit_transform(X_touch)
                 X_transform, updated_col_map = transformer.combine_and_reindex(X_touched, X_untouched, working_features)
                 self._set_working_features(updated_col_map)
                 if train == True:
-                    self._output_features(transform_name)
-                    self._update_working_data_feature_names_ref(transform_name)
+                    self._output_features(transformer_name)
+                    self._update_working_data_feature_names_ref(transformer_name)
+                    if transformer.store:
+                        artifact_dir = self.artifact_dir
+                        transformer.store_output(X_transform,output_dir=artifact_dir)
                 i += 1
         return X_transform
 
 
-class Transform:
+class Transformer:
 
     def __init__(self,model_config):
-        feature_eng_settings = model_config['feature_settings']['feature_engineering']
         self.base_transformer = None
-        self.configure_transform(feature_eng_settings)
+        self.configure_transform(model_config)
 
-    def configure_transform(self,feature_eng_settings):
+    def configure_transform(self,model_config):
+        feature_eng_settings = model_config['feature_settings']['feature_engineering']
         transform_class = str(self.__class__).split('.')[-1:][0]
-        transform_settings = self.fetch_transform_settings(feature_eng_settings, transform_class)
-        if transform_settings.has_key('kwargs'):
-            kwargs = transform_settings['kwargs']
+        transformer_settings = self.fetch_transform_settings(feature_eng_settings, transform_class)
+        if transformer_settings.has_key('kwargs'):
+            kwargs = transformer_settings['kwargs']
         else:
             kwargs = dict()
         self.kwargs = kwargs
-        self.inclusion_patterns = transform_settings['inclusion_patterns']
+        if transformer_settings.has_key('store_output'):
+            self.store = True
+        else:
+            self.store = False
+        self.model_name = model_config['model_name']
+        self.inclusion_patterns = transformer_settings['inclusion_patterns']
 
     def fetch_transform_settings(self,feature_eng_settings, transform_name):
         for item in feature_eng_settings:
@@ -100,9 +110,16 @@ class Transform:
     def fit_transform(self,X_touch):
         X_touched = self.base_transformer.fit_transform(X_touch)
         if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
-            return pd.DataFrame(X_touched)
+            rdf = pd.DataFrame(X_touched)
         else:
-            return X_touched
+            rdf = X_touched
+        return rdf
+
+    def store_output(self,X_mat,output_dir):
+        model_name = self.model_name
+        transform_name = str(self.__class__).split('.')[-1:][0]
+        output_file_name = slugify(model_name + '-' + transform_name)
+        X_mat.to_csv(output_dir + '/' + output_file_name + '.txt', header=False, index=False, sep='\t')  # TODO: fix this when I move out of pandas
 
     def combine_and_reindex(self, Xt_df, Xut_df, col_map):
         Xt_df = pd.DataFrame(Xt_df)
@@ -134,10 +151,10 @@ class Transform:
     def gen_new_column_names(self,Xt_df,col_map):
         pass
 
-class basis_expansion(Transform):
+class basis_expansion(Transformer):
 
     def __init__(self,model_config):
-        Transform.__init__(self,model_config)
+        Transformer.__init__(self, model_config)
         self.set_base_transformer(PolynomialFeatures(**self.kwargs))
 
     def gen_new_column_names(self, Xt_df):
@@ -152,10 +169,10 @@ class basis_expansion(Transform):
         return Xt_feat_names
 
 
-class normalize(Transform):
+class normalize(Transformer):
 
     def __init__(self,model_config):
-        Transform.__init__(self,model_config)
+        Transformer.__init__(self, model_config)
         self.set_base_transformer(Normalizer(**self.kwargs))
 
     def gen_new_column_names(self,Xt_df,col_map):
@@ -166,10 +183,10 @@ class normalize(Transform):
             Xt_feat_names.append(norm_feature_name)
         return Xt_feat_names
 
-class pca(Transform):
+class pca(Transformer):
 
     def __init__(self,model_config):
-        Transform.__init__(self,model_config)
+        Transformer.__init__(self, model_config)
         self.set_base_transformer(PCA(**self.kwargs))
 
     def gen_new_column_names(self,Xt_df,col_map):

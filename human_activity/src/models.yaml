@@ -19,6 +19,7 @@ Models:
     feature_settings:
         feature_engineering:
           - pca:
+              store_output: True
               inclusion_patterns:
                 - All
               kwargs:
