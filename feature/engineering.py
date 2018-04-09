@@ -5,6 +5,7 @@ import pandas as pd
 from manipulator import Manipulator
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
 from django.utils.text import slugify
@@ -149,7 +150,7 @@ class Transformer:
         return X_transform, new_col_map
 
     def gen_new_column_names(self,Xt_df,col_map):
-        pass
+        raise NotImplementedError
 
 class basis_expansion(Transformer):
 
@@ -180,6 +181,21 @@ class normalize(Transformer):
         for idx in Xt_df.columns.tolist():
             base_feature_name = col_map[idx]
             norm_feature_name = 'norm(' + base_feature_name + ')'
+            Xt_feat_names.append(norm_feature_name)
+        return Xt_feat_names
+
+
+class standard_scale(Transformer):
+
+    def __init__(self,model_config):
+        Transformer.__init__(self,model_config)
+        self.set_base_transformer(StandardScaler(**self.kwargs))
+
+    def gen_new_column_names(self,Xt_df,col_map):
+        Xt_feat_names = list()
+        for idx in Xt_df.columns.tolist():
+            base_feature_name = col_map[idx]
+            norm_feature_name = 'scaled(' + base_feature_name + ')'
             Xt_feat_names.append(norm_feature_name)
         return Xt_feat_names
 

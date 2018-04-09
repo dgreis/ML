@@ -9,25 +9,23 @@ Models:
   #      exclusion_patterns:
   #        - fBodyGyro-bandsEnergy
 
+  #SVM LinKernel:
+  #  base_algorithm: SVC
+  #  keyword_arg_settings:
+  #    kernel: "linear"
+  #    C: 1
 
-  Base Multinomial Classifier:
-    base_algorithm: Multinomial_Classifier
+  SVM LinKernel with Scale:
+    base_algorithm: SVC
     keyword_arg_settings:
-        multi_class: "multinomial"
-        solver: "lbfgs"
-        penalty: "l2"
+        kernel: "linear"
+        C: 1
     feature_settings:
-        select_before_eng: True
-        feature_engineering:
-          - pca:
-              store_output: True
-              inclusion_patterns:
-                - All
-              kwargs:
-                n_components: 3
-        feature_selection:
-            - exclusion_patterns:
-                - fBodyGyro-bandsEnergy
+      feature_selection:
+         - recursive_feature_elimination:
+            kwargs:
+                verbose: 1
+                step: 200
 
 
   #Random_Forest:

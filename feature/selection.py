@@ -3,11 +3,14 @@ import importlib
 import inspect
 
 from manipulator import Manipulator
+from algorithms.classification import *
+from algorithms.regression import *
 
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import SelectFromModel
+from sklearn.feature_selection import RFECV
 
 class FilterChain(Manipulator):
 
@@ -139,3 +142,23 @@ class l1_based(Filter):
         X_filt = X_train.iloc[:,nonzero_features]
         return X_filt
 
+class recursive_feature_elimination(Filter):
+
+    def __init__(self,model_config):
+        Filter.__init__(self,model_config)
+        self.rfe_settings = self.fetch_filter_settings('recursive_feature_elimination')
+
+
+    def apply(self,X_train,y_train):
+        rfe_settings = self.rfe_settings
+        kwargs = rfe_settings['kwargs']
+        #estimator_class_name = kwargs['estimator']
+        #current_mod = importlib.import_module('feature.selection')
+        #estimator_class = getattr(current_mod,estimator_class_name)
+        #estimator = estimator_class()
+        estimator = SVC(kernel='linear')
+        remaining_kwargs_keys = filter(lambda x: x not in ['estimator'],kwargs.keys())
+        remaining_kwargs = {k: kwargs[k] for k in remaining_kwargs_keys}
+        selector = RFECV(estimator,**remaining_kwargs)
+        X_filt = selector.fit_transform(X_train,y_train)
+        return pd.DataFrame(X_filt)
