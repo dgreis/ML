@@ -1,8 +1,6 @@
 import importlib
 import yaml
 import os
-import operator as op
-
 
 def find_data_dir(project_settings):
     abs_project_dir = find_project_dir(project_settings)
@@ -75,7 +73,7 @@ def configure_models(model_config, project_settings):
 
 def all_clean_input_files_exist(project_settings):
     data_dir = find_data_dir(project_settings)
-    rel_filepaths = project_settings['clean_input_files']
+    rel_filepaths = project_settings['clean_input_files'].values()
     abs_filepaths = [data_dir + '/' + fp for fp in rel_filepaths]
     for fp in abs_filepaths:
         if not os.path.isfile(fp):
