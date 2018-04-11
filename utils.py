@@ -2,6 +2,8 @@ import importlib
 import yaml
 import os
 
+from algorithms.wrapper import Wrapper
+
 def find_data_dir(project_settings):
     abs_project_dir = find_project_dir(project_settings)
     rel_data_dir = project_settings['data_dir']
@@ -57,18 +59,19 @@ def set_default_configs_if_missing(model_configs, project_settings):
                         model_configs['Models'][model_name]['feature_settings'][sub_facet] = default_feature_settings[sub_facet]
     return model_configs
 
-def configure_models(model_config, project_settings):
-    ml_problem_type = project_settings['ml_problem_type']
-    module_map = project_settings['module_map']
-    ml_module = importlib.import_module('algorithms.' + module_map[ml_problem_type])
+def configure_models(model_config):
     models = model_config['Models']
     algos = dict()
     for model_name in models:
-        base_class = getattr(ml_module,models[model_name]['base_class'])
+        module_comps = models[model_name]['base_algorithm'].split('.')
+        module_name = ('.').join(module_comps[:-1])
+        module = importlib.import_module(module_name)
+        base_algo_class_name = module_comps[-1:][0]
+        base_algo_class = getattr(module,base_algo_class_name)
         kwargs = models[model_name]['keyword_arg_settings']
         other_options = models[model_name]['other_options']
-        base_class_instance = base_class(other_options, **kwargs)
-        algos[model_name] = base_class_instance
+        algo_wrapper_instance = Wrapper(base_algo_class, other_options, **kwargs)
+        algos[model_name] = algo_wrapper_instance
     return algos
 
 

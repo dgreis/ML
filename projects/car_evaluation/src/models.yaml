@@ -1,7 +1,7 @@
 
 Models:
   Base Multinomial Classifier:
-    base_class: Logistic_Classifier
+    base_algorithm: sklearn.linear_model.LogisticRegression
     keyword_arg_settings:
         multi_class: "multinomial"
         solver: "lbfgs"

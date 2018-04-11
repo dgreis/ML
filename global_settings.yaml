@@ -10,10 +10,7 @@ model_facet_defaults:
         feature_selection: []
     cross_validation_settings: None
 
-module_map:
-  multiclass-classification: 'classification'
-  binary-classification: 'classfication'
-  regression: 'regression'
+
 
 metrics:
   binary-classification:

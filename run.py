@@ -22,7 +22,7 @@ def main():
     project_settings['working_files'] = project_settings['clean_input_files'].copy()
 
     model_configs = load_model_configs(project_settings)
-    models = configure_models(model_configs, project_settings)
+    models = configure_models(model_configs)
     num_models = len(models)
 
     print "\nFit ML models for project: " + project_settings['project_name']
