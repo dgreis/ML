@@ -70,8 +70,11 @@ def configure_models(model_config):
         base_algo_class = getattr(module,base_algo_class_name)
         kwargs = models[model_name]['keyword_arg_settings']
         other_options = models[model_name]['other_options']
-        algo_wrapper_instance = Wrapper(base_algo_class, other_options, **kwargs)
-        algos[model_name] = algo_wrapper_instance
+        if 'algorithms' not in module_name:
+            base_algo_instance = Wrapper(base_algo_class, other_options, **kwargs)
+        else:
+            base_algo_instance = base_algo_class(other_options,**kwargs)
+        algos[model_name] = base_algo_instance
     return algos
 
 
