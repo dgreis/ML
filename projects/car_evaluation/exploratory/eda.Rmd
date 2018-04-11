@@ -1,0 +1,31 @@
+---
+title: "EDA for car_evaluation"
+output: html_notebook
+---
+
+
+```{r}
+
+df = read.csv("../data/car.data.txt",header=FALSE)
+names(df) = c('buying','maint','doors','persons','lug_boot','safety','class')
+df$buying = factor(df$buying,levels=c('low','med','high','vhigh'))
+df$maint = factor(df$maint, levels=c('low','med','high','vhigh'))
+df$lug_boot = factor(df$lug_boot,levels=c('small','med','big'))
+df$safety = factor(df$safety,levels=c('low','med','high'))
+df$class = factor(df$class, levels=c("unacc","acc","good","vgood"))
+
+```
+
+What does a linear model have to say about this?
+
+```{R}
+require(nnet)
+m = multinom(class ~ ., data=df)
+summary(m)
+```
+
+```{r}
+z <- summary(m)$coefficients/summary(m)$standard.errors
+p <- (1 - pnorm(abs(z), 0, 1)) * 2
+p
+```

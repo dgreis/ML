@@ -5,6 +5,8 @@
 *.DS_Store
 *.names
 *.zip
+*.nb.html
+projects/*/data
 projects/*/evaluation
 projects/*/model_artifacts
 

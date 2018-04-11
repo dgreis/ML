@@ -1,0 +1,69 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+bank_input = "~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/bank-full.csv"
+addl_input = "~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank-additional/bank-additional-full.csv"
+df = read.csv(bank_input,sep=";")
+df$month = factor(df$month,levels=c("jan","feb","mar","apr","may","jun","jul","aug",
+                                    "sep","oct","nov","dec"))
+
+df$outcome = ifelse(df$y=='yes',1,0)
+df = df[,!(names(df) %in% c('y'))]
+
+mycolSums<-function(x){
+  return(x/sum(x))
+}
+
+```
+The major difference between the two datasets is that the `bank-addtional` has some macro-economic indicators.
+
+```{r}
+m = glm(outcome~.,data=df,family='binomial')
+summary(m)
+```
+
+```{R}
+codf = data.frame(summary(m)$coef)
+sigdf = codf[codf[,'Pr...z..'] <0.05,]
+sigdf[order(sigdf$Estimate,decreasing = T),]
+```
+
+```{r}
+with(df,plot(factor(outcome) ~ factor(month)))
+```
+
+```{R}
+t = table(df$month,df$outcome)
+t/rowSums(t)
+```
+
+Way more likely to succeed in mar and dec
+
+```{r}
+with(df,plot(job ~ month))
+```
+```{R}
+apply(table(df$job,df$month),2,mycolSums)
+```
+There seems to be some variation here across the year in terms of job. Maybe try an interaction term
+
+```{R}
+with(df,plot(poutcome~job))
+```
+```{R}
+issuc = ifelse(df$poutcome == 'success', 1, 0)
+m = glm(issuc ~ job,data=df,family='binomial')
+summary(m)
+```
+Maybe an interaction term there as well
+
+What about marital?
+
+```{r}
+summary(glm(outcome~marital*job,data=df,family='binomial'))
+```
+
+I think I'll try an interaction term there as well.
