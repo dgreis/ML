@@ -147,12 +147,12 @@ class tree_based(Filter):
 
     def __init__(self,model_config):
         Filter.__init__(self,model_config)
-        self.tree_based_settings = self.fetch_filter_settings('tree_based')
+        self.tree_based_settings = self.fetch_filter_settings('tree_based') #TODO: Make more like Transform constructor
 
     def apply(self,X_train,y_train,project_settings):
 
         tree_based_settings = self.tree_based_settings
-        tree_based_settings['model_name'] = 'tree-based-feature-selection'
+        tree_based_settings['model_name'] = 'tree-based-feature-selection' #TODO: add this onto existing model name
         clf = Decision_Tree_Classifier(tree_based_settings,project_settings)
         clf = clf.fit(X_train, y_train)
         if clf.gen_output_flag:
