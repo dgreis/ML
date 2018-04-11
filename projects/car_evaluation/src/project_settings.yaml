@@ -10,6 +10,6 @@ preprocessed_input_files:
 clean_input_files:
   X_train : "processed/X_train.txt"
   y_train : "processed/y_train.txt"
-  X_test : "processed/x_test.txt"
+  X_test : "processed/X_test.txt"
   y_test : "processed/y_test.txt"
   feature_names: "processed/features.txt"

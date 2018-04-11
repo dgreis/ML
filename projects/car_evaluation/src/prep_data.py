@@ -62,7 +62,7 @@ def main():
         Xe, y, test_size=split_perc, random_state=42)
 
     i = 0
-    for dataset_name in ["X_train", "X_test", "y_train", "y_test"]:
+    for dataset_name in ["X_test", "X_train", "y_test", "y_train"]:
         array_i = numpy_arrays[i]
         df_i = pd.DataFrame(array_i)
         rel_file_path = clean_input_files[dataset_name]
