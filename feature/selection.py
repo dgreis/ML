@@ -3,6 +3,7 @@ import importlib
 import inspect
 
 from manipulator import Manipulator
+from utils import flip_dict
 from algorithms.classification import *
 from algorithms.regression import *
 
@@ -26,7 +27,7 @@ class FilterChain(Manipulator):
         self._pass_y_train_to_fc(y_train)
         X_filt = X_train
         orig_inv_col_map = self.inv_column_map
-        orig_col_map = {v: k for k, v in orig_inv_col_map.iteritems()}
+        orig_col_map = flip_dict(orig_inv_col_map)
         init_num_feats = len(X_train.columns)  #this might need to be changed when no longer pandas
         i = 1
         if len(filters) < 1:
@@ -75,7 +76,7 @@ class FilterChain(Manipulator):
                 X_filt = X_mat.iloc[:, working_features.keys()]
             else:
                 filt_indices = list()
-                inv_working_features = {v: k for k, v in working_features.iteritems()}
+                inv_working_features = flip_dict(working_features)
                 orig_inv_col_map = self.inv_column_map
                 for col in inv_working_features:
                     if orig_inv_col_map.has_key(col):

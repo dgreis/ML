@@ -6,4 +6,5 @@
 *.names
 *.zip
 projects/*/evaluation
+projects/*/model_artifacts
 

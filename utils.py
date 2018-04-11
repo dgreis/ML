@@ -1,8 +1,6 @@
-import importlib
+import pandas as pd
 import yaml
 import os
-
-from algorithms.wrapper import Wrapper
 
 def find_data_dir(project_settings):
     abs_project_dir = find_project_dir(project_settings)
@@ -59,25 +57,6 @@ def set_default_configs_if_missing(model_configs, project_settings):
                         model_configs['Models'][model_name]['feature_settings'][sub_facet] = default_feature_settings[sub_facet]
     return model_configs
 
-def configure_models(model_config):
-    models = model_config['Models']
-    algos = dict()
-    for model_name in models:
-        module_comps = models[model_name]['base_algorithm'].split('.')
-        module_name = ('.').join(module_comps[:-1])
-        module = importlib.import_module(module_name)
-        base_algo_class_name = module_comps[-1:][0]
-        base_algo_class = getattr(module,base_algo_class_name)
-        kwargs = models[model_name]['keyword_arg_settings']
-        other_options = models[model_name]['other_options']
-        if 'algorithms' not in module_name:
-            base_algo_instance = Wrapper(base_algo_class, other_options, **kwargs)
-        else:
-            base_algo_instance = base_algo_class(other_options,**kwargs)
-        algos[model_name] = base_algo_instance
-    return algos
-
-
 def all_clean_input_files_exist(project_settings):
     data_dir = find_data_dir(project_settings)
     rel_filepaths = project_settings['clean_input_files'].values()
@@ -87,4 +66,29 @@ def all_clean_input_files_exist(project_settings):
             return False
     return True
 
+def flip_dict(orig_dict):
+    flipped_dict = {v:k for k,v in orig_dict.iteritems()}
+    return flipped_dict
 
+def is_fully_qualified_path(project_settings, path):
+    repo_loc = project_settings['repo_loc']
+    if repo_loc in path:
+        return True
+    else:
+        return False
+
+def load_working_file_filepath(project_settings, data_ref):
+    assert project_settings.has_key('working_files')
+    working_files = project_settings['working_files']
+    filepath = working_files[data_ref]
+    if is_fully_qualified_path(project_settings, filepath):
+        wf_abs_filepath = filepath
+    else:
+        data_dir = find_data_dir(project_settings)
+        wf_abs_filepath = data_dir + '/' + filepath
+    return wf_abs_filepath
+
+
+def load_inv_column_map(filepath):
+    df = pd.read_csv(filepath, sep="\s+", engine='python', names=['col_name'])
+    return pd.Series(df.index, index=df.col_name).to_dict()

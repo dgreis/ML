@@ -3,7 +3,7 @@ import os
 
 from django.utils.text import slugify
 
-from utils import find_data_dir, find_project_dir
+from utils import find_data_dir, find_project_dir, load_working_file_filepath, load_inv_column_map
 
 
 class Manipulator:
@@ -24,27 +24,11 @@ class Manipulator:
         self.working_features = None
 
         if original_columns == False:
-            column_names_filepath = self.load_working_file_filepath('feature_names')
+            feature_names_filepath = load_working_file_filepath(self.project_settings, 'feature_names')
         else:
-            column_names_filepath = self.load_clean_input_file_filepath('feature_names')
-        inv_column_map = self.load_inv_column_map(column_names_filepath)
+            feature_names_filepath = self.load_clean_input_file_filepath('feature_names')
+        inv_column_map = load_inv_column_map(feature_names_filepath)
         self.inv_column_map = inv_column_map
-
-    def load_inv_column_map(self, filepath):
-        df = pd.read_csv(filepath, sep="\s+", engine='python', names=['col_name'])
-        return pd.Series(df.index, index=df.col_name).to_dict()
-
-    def load_working_file_filepath(self,data_ref):
-        project_settings = self.project_settings
-        assert project_settings.has_key('working_files')
-        working_files = project_settings['working_files']
-        filepath = working_files[data_ref]
-        if self._is_fully_qualified_path(filepath):
-            wf_abs_filepath = filepath
-        else:
-            data_dir = find_data_dir(project_settings)
-            wf_abs_filepath = data_dir + '/' + filepath
-        return wf_abs_filepath
 
     def load_clean_input_file_filepath(self,data_ref):
         project_settings = self.project_settings
@@ -52,14 +36,6 @@ class Manipulator:
         data_dir = find_data_dir(project_settings)
         cif_abs_filepath = data_dir + '/' + cif_rel_filepath
         return cif_abs_filepath
-
-    def _is_fully_qualified_path(self,path):
-        project_settings = self.project_settings
-        repo_loc = project_settings['repo_loc']
-        if repo_loc in path:
-            return True
-        else:
-            return False
 
     #def fit(self,X_train,y_train=None):
     #    pass

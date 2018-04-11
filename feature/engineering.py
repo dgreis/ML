@@ -3,6 +3,7 @@ import importlib
 import pandas as pd
 
 from manipulator import Manipulator
+from utils import flip_dict
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import StandardScaler
@@ -31,7 +32,7 @@ class TransformChain(Manipulator):
             working_features = self.working_features
             if working_features is None:
                 inv_column_map = self.inv_column_map
-                working_features = {v: k for k, v in inv_column_map.iteritems()}
+                working_features = flip_dict(inv_column_map)
             for d in transformations:
                 transformer_name = d.keys()[0]
                 print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
@@ -94,7 +95,7 @@ class Transformer:
         col_indices = working_features.keys()
         col_names = working_features.values()
         inclusion_patterns = self.inclusion_patterns
-        inv_working_features = {v: k for k, v in working_features.iteritems()}
+        inv_working_features = flip_dict(working_features)
         if inclusion_patterns == ['All']:
             X_untouched = pd.DataFrame()
             X_touch = X_mat
