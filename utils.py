@@ -64,10 +64,11 @@ def configure_models(model_config, project_settings):
     models = model_config['Models']
     algos = dict()
     for model_name in models:
-        algo_class = getattr(ml_module,models[model_name]['base_algorithm'])
+        base_class = getattr(ml_module,models[model_name]['base_class'])
         kwargs = models[model_name]['keyword_arg_settings']
-        algo_instance = algo_class(**kwargs)
-        algos[model_name] = algo_instance
+        other_options = models[model_name]['other_options']
+        base_class_instance = base_class(other_options, **kwargs)
+        algos[model_name] = base_class_instance
     return algos
 
 

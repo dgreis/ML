@@ -44,6 +44,9 @@ def main():
             model = validator.set_optimal_hyperparams(model)
         print "Next Step: Fit Model"
         model.fit(X_train,y_train)
+        if model.gen_output_flag == True:
+            model.gen_output()
+        assert 1 == 1
         print 'Model Fit. Next Step: Perform Model Evaluation'
         y_pred = model.predict(X_test)
         evaluation_battery = load_evaluation_battery(project_settings)
