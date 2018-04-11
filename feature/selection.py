@@ -4,7 +4,7 @@ import inspect
 
 from manipulator import Manipulator
 from utils import flip_dict
-from algorithms.classification import *
+from algorithms.classification import Decision_Tree_Classifier
 from algorithms.regression import *
 
 from sklearn.svm import LinearSVC
@@ -141,6 +141,25 @@ class l1_based(Filter):
         #model = SelectFromModel(l1_model,prefit=True) #This is not the same as the way I'm implementing it!
         #X_filt = pd.DataFrame(model.transform(X_train))
         X_filt = X_train.iloc[:,nonzero_features]
+        return X_filt
+
+class tree_based(Filter):
+
+    def __init__(self,model_config):
+        Filter.__init__(self,model_config)
+        self.tree_based_settings = self.fetch_filter_settings('tree_based')
+
+    def apply(self,X_train,y_train,project_settings):
+
+        tree_based_settings = self.tree_based_settings
+        tree_based_settings['model_name'] = 'tree-based-feature-selection'
+        clf = Decision_Tree_Classifier(tree_based_settings,project_settings)
+        clf = clf.fit(X_train, y_train)
+        if clf.gen_output_flag:
+            clf.gen_output()
+
+        model = SelectFromModel(clf, prefit=True)
+        X_filt = pd.DataFrame(model.transform(X_train))
         return X_filt
 
 class recursive_feature_elimination(Filter):

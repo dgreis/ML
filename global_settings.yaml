@@ -1,5 +1,5 @@
 repo_loc: "/Users/davidgreis/Documents/Personal/Data_Projects/ML"
-current_project: "car_evaluation"
+current_project: "human_activity"
 
 model_facet_defaults:
     keyword_arg_settings : {}

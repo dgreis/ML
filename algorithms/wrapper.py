@@ -27,7 +27,12 @@ class Wrapper(object):
             self.gen_output_flag = False
 
     def fit(self,X,y):
-        return self.base_algorithm.fit(X,y)
+        self.base_algorithm.fit(X,y)
+        if hasattr(self.base_algorithm,'coef_'):
+            setattr(self,'coef_',getattr(self.base_algorithm,'coef_'))
+        if hasattr(self.base_algorithm,'feature_importances_'):
+            setattr(self,'feature_importances_',getattr(self.base_algorithm,'feature_importances_'))
+        return self
 
     def predict(self,X):
         return self.base_algorithm.predict(X)

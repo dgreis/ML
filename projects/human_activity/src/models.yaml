@@ -1,26 +1,19 @@
 Models:
 
   Base Multinomial Classifier (All Feats):
-    base_class: Multinomial_Classifier
+    base_algorithm: sklearn.linear_model.LogisticRegression
     keyword_arg_settings:
         multi_class: "multinomial"
         solver: "lbfgs"
     feature_settings:
         feature_selection:
-          - exclusion_patterns:
-            - fBodyGyro-bandsEnergy
-        feature_engineering:
-          - normalize:
-              inclusion_patterns:
-                - All
+          - tree_based:
+              keyword_arg_settings: {}
+              other_options:
+                gen_output: True
 
 
 
-  SVM LinKernel:
-    base_class: SVC
-    keyword_arg_settings:
-      kernel: "linear"
-      C: 1
 
   #Random_Forest:
   #    base_class: Random_Forest_Classifier
