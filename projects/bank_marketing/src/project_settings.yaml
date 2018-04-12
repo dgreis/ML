@@ -12,3 +12,16 @@ clean_input_files:
   X_test : "processed/X_test.txt"
   y_test : "processed/y_test.txt"
   feature_names: "processed/features.txt"
+
+metrics:
+  multiclass-classification:
+        battery:
+          f1_score:
+            metric_type: column
+            kwargs: { "average" : "binary" }
+          recall_score:
+            metric_type: column
+            kwargs: { "average" : "binary" }
+          precision_score:
+            metric_type: column
+            kwargs: { "average" : "binary" }

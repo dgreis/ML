@@ -1,6 +1,7 @@
 import pandas as pd
 import yaml
 import os
+import collections
 
 def find_data_dir(project_settings):
     abs_project_dir = find_project_dir(project_settings)
@@ -20,8 +21,17 @@ def configure_project_settings(global_settings):
     project_settings_loc = abs_project_dir + '/src/project_settings.yaml'
     project_settings = yaml.load(open(project_settings_loc))
     new_settings = global_settings.copy()
-    new_settings.update(project_settings)
+    #new_settings.update(project_settings)
+    new_settings = update(new_settings, project_settings)
     return new_settings
+
+def update(d, u):
+    for k, v in u.iteritems():
+        if isinstance(v, collections.Mapping):
+            d[k] = update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
 
 def load_model_configs(project_settings):
     abs_project_dir = find_project_dir(project_settings)
