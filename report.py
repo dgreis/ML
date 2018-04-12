@@ -2,6 +2,7 @@ import pandas as pd
 
 from collections import defaultdict
 from utils import *
+from evaluation import load_evaluation_battery
 
 class Report:
 
@@ -25,14 +26,14 @@ class Report:
         if not os.path.isdir(eval_dir):
             os.makedirs(eval_dir)
         with open(eval_dir + '/report.html',"w") as f:
-            eval_pak = fetch_eval_pak(project_settings)
+            eval_battery = load_evaluation_battery(project_settings)
             entries = self.entries
-            column_entries = {k: v for k, v in entries.iteritems() if eval_pak['battery'][k]['metric_type'] == 'column'}
+            column_entries = {k: v for k, v in entries.iteritems() if eval_battery[k]['metric_type'] == 'column'}
             column_table = pd.DataFrame(column_entries)
             column_table_html = column_table.T.to_html()
             f.write('<h1>Overall</h1>')
             f.write(column_table_html)
-            array_entries = {k: v for k, v in entries.iteritems() if eval_pak['battery'][k]['metric_type'] == 'array'}
+            array_entries = {k: v for k, v in entries.iteritems() if eval_battery[k]['metric_type'] == 'array'}
             for entry in array_entries:
                 f.write("<h1>" + entry + "</h1>")
                 models = array_entries[entry]
@@ -42,7 +43,7 @@ class Report:
                     array_table = pd.DataFrame(array)
                     array_table_html = array_table.to_html()
                     f.write(array_table_html)
-            cr_entries = {k: v for k, v in entries.iteritems() if eval_pak['battery'][k]['metric_type'] == 'classification_report'}
+            cr_entries = {k: v for k, v in entries.iteritems() if eval_battery[k]['metric_type'] == 'classification_report'}
             for entry in cr_entries:
                 f.write("<h1>" + entry + "</h1>")
                 models = cr_entries[entry]

@@ -14,11 +14,14 @@ model_facet_defaults:
 
 metrics:
   binary-classification:
-      - precision_recall_curve
-      - roc_curve
+      battery:
+        precision_recall_curve:
+          metric_type: unknown
+          kwargs: {}
+        roc_curve:
+          metric_type: unknown
+          kwargs: {}
   multiclass-classification:
-        standard_keyword_args:
-          average: 'weighted'
         battery:
           confusion_matrix:
             metric_type: array
@@ -31,9 +34,12 @@ metrics:
             kwargs: {}
           f1_score:
             metric_type: column
+            kwargs: { "average" : "weighted" }
           recall_score:
             metric_type: column
+            kwargs: { "average" : "weighted" }
           precision_score:
             metric_type: column
+            kwargs: { "average" : "weighted" }
 
 

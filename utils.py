@@ -19,20 +19,9 @@ def configure_project_settings(global_settings):
     abs_project_dir = repo_loc + '/projects/' + global_settings['current_project']
     project_settings_loc = abs_project_dir + '/src/project_settings.yaml'
     project_settings = yaml.load(open(project_settings_loc))
-    ml_problem_type = project_settings['ml_problem_type']
-    eval_pak = global_settings['metrics'][ml_problem_type]
-    battery = eval_pak['battery']
-    for metric in battery:
-        if not battery[metric].has_key('kwargs'):
-            battery[metric]['kwargs'] = eval_pak['standard_keyword_args']
     new_settings = global_settings.copy()
     new_settings.update(project_settings)
     return new_settings
-
-def fetch_eval_pak(project_settings):
-    ml_problem_type = project_settings['ml_problem_type']
-    eval_pak = project_settings['metrics'][ml_problem_type]
-    return eval_pak
 
 def load_model_configs(project_settings):
     abs_project_dir = find_project_dir(project_settings)
