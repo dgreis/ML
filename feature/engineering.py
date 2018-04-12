@@ -112,7 +112,7 @@ class Transformer:
     def fit_transform(self,X_touch):
         X_touched = self.base_transformer.fit_transform(X_touch)
         if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
-            rdf = pd.DataFrame(X_touched)
+            rdf = pd.DataFrame(X_touched,columns=X_touch.columns)
         else:
             rdf = X_touched
         return rdf
@@ -124,8 +124,6 @@ class Transformer:
         X_mat.to_csv(output_dir + '/' + output_file_name + '.txt', header=False, index=False, sep='\t')  # TODO: fix this when I move out of pandas
 
     def combine_and_reindex(self, Xt_df, Xut_df, col_map):
-        Xt_df = pd.DataFrame(Xt_df)
-        Xut_df = pd.DataFrame(Xut_df)
         Xt_feat_names = self.gen_new_column_names(Xt_df, col_map)
         untouched_indices = Xut_df.columns.tolist()
         new_col_map = dict()
