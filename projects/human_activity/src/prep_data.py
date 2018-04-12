@@ -14,7 +14,7 @@ def main():
     if not os.path.isdir(processed_dir):
         os.makedirs(processed_dir)
 
-    raw_files = project_settings['preprocessed_input_files']
+    raw_files = project_settings['raw_input_files']
 
     ##Remove duplicate columns or alter their names
     column_names_filepath = data_dir + '/' + raw_files['feature_names']

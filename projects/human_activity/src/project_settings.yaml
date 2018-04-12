@@ -4,7 +4,7 @@ ml_problem_type: 'multiclass-classification'
 data_dir : "data/UCI HAR Dataset"
 #parse_sep : "'\s+"
 parse_engine: "python"
-preprocessed_input_files:
+raw_input_files:
   feature_names: "features.txt"
 clean_input_files:
   X_train : "train/X_train.txt"

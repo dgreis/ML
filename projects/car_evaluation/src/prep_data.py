@@ -13,7 +13,7 @@ project_settings = configure_project_settings(global_settings)
 def main():
 
     data_dir = find_data_dir(project_settings)
-    raw_files = project_settings['preprocessed_input_files']
+    raw_files = project_settings['raw_input_files']
 
     X_filepath = data_dir + '/' + raw_files['X']
     df = pd.read_csv(X_filepath,header=None)
@@ -54,8 +54,8 @@ def main():
 
     clean_input_files = project_settings['clean_input_files']
     feature_names_rel_filepath = clean_input_files['feature_names']
-    feature_names_abs_filetpah = data_dir + '/' + feature_names_rel_filepath
-    pd.Series(feature_names).to_csv(feature_names_abs_filetpah,index=False,header=None,sep="\t")
+    feature_names_abs_filepath = data_dir + '/' + feature_names_rel_filepath
+    pd.Series(feature_names).to_csv(feature_names_abs_filepath,index=False,header=None,sep="\t")
 
     split_perc = project_settings['test_train_split']
     numpy_arrays = train_test_split(

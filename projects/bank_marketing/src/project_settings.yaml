@@ -1,12 +1,11 @@
-
-project_name : "car_evaluation"
-ml_problem_type: 'multiclass-classification'
-data_dir : "data"
+project_name : "bank_marketing"
+ml_problem_type: 'binary-classification'
+data_dir : "data/bank"
 #parse_sep : "'\s+"
 parse_engine: "python"
 test_train_split: 0.7
 raw_input_files:
-  X : "car.data.txt"
+  X : "bank-full.csv"
 clean_input_files:
   X_train : "processed/X_train.txt"
   y_train : "processed/y_train.txt"

@@ -1,0 +1,4 @@
+Models:
+
+  Logistic Regression:
+    base_algorithm: sklearn.linear_model.LogisticRegression
