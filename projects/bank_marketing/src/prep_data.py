@@ -1,3 +1,4 @@
+from __future__ import division
 import yaml
 import pandas as pd
 import numpy as np
@@ -92,18 +93,22 @@ def main():
     feature_names_abs_filepath = data_dir + '/' + feature_names_rel_filepath
     pd.Series(feature_names).to_csv(feature_names_abs_filepath,index=False,header=None,sep="\t")
 
-    split_perc = project_settings['test_train_split']
-    numpy_arrays = train_test_split(
-        Xe, y, test_size=split_perc, random_state=42)
-
-    i = 0
-    for dataset_name in ["X_test", "X_train", "y_test", "y_train"]:
-        array_i = numpy_arrays[i]
-        df_i = pd.DataFrame(array_i)
-        rel_file_path = clean_input_files[dataset_name]
+    split_perc = project_settings['train_test_split']
+    s1_dfs = [pd.DataFrame(x) for x in train_test_split(Xe, y, test_size=split_perc, random_state=42)]
+    s1_names = ["X_test", "X_train_val", "y_test", "y_train_val"]
+    dd1 = dict(zip(s1_names, s1_dfs))
+    for name in dd1:
+        rel_file_path = clean_input_files[name]
         abs_file_path = data_dir + '/' + rel_file_path
-        df_i.to_csv(abs_file_path,header=None,sep="\t",index=False)
-        i += 1
+        dd1[name].to_csv(abs_file_path,header=None,sep="\t",index=False)
+    X_train_val, y_train_val = dd1['X_train_val'], dd1['y_train_val']
 
-
-    assert 1 == 1
+    num_folds = project_settings['assessment']['cv_num_folds']
+    perc = 1 / num_folds
+    s2_dfs = [pd.DataFrame(x) for x in train_test_split(X_train_val,y_train_val,test_size=perc)]
+    s2_names = ["X_train","X_val","y_train","y_val"]
+    dd2 = dict(zip(s2_names,s2_dfs))
+    for name in dd2:
+        rel_file_path = clean_input_files[name]
+        abs_file_path = data_dir + '/' + rel_file_path
+        dd2[name].to_csv(abs_file_path,header=None,sep="\t",index=False)

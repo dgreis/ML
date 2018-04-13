@@ -64,10 +64,14 @@ class FilterChain(Manipulator):
     def _pass_y_train_to_fc(self, y_train):
         self.y_train = y_train
 
-    def transform(self, X_mat,original_columns=False):
+    def transform(self, X_mat,original_columns=False,dataset_name=None):
         filters = self.filters
+        if dataset_name is not None:
+            log_prefix = dataset_name
+        else:
+            log_prefix = "Non-training"
         if len(filters) > 0:
-            print "\t[Test] Filtering selected features"
+            print "\t["+log_prefix+"] Filtering selected features"
             working_features = self.working_features  # { ind : feat_name }
             #if not original_columns:
             #    X_filt = X_mat.iloc[:, working_features.keys()]

@@ -1,4 +1,26 @@
 Models:
 
-  Logistic Regression:
+  #Logistic Regression Base:
+  #  base_algorithm: sklearn.linear_model.LogisticRegression
+
+  Logistic Regression NormFeats:
     base_algorithm: sklearn.linear_model.LogisticRegression
+    hyperparam_tuning_settings:
+      hyperparams:
+        C: "[0.1, 1, 10]"
+      num_folds: 5
+      eval_metric: "f1_score"
+    feature_settings:
+      feature_engineering:
+        - normalize:
+            inclusion_patterns:
+              - campaign
+        - interaction_terms:
+            interactions:
+              - ("job","month")
+   #         kwargs:
+   #           interaction_only: True
+   #           include_bias: False
+      feature_selection:
+        - exclusion_patterns:
+          - pdays

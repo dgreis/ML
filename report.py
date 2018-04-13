@@ -1,7 +1,8 @@
 import pandas as pd
 
 from collections import defaultdict
-from utils import *
+from utils import update, find_project_dir
+import os
 from evaluation import load_evaluation_battery
 
 class Report:
@@ -18,6 +19,11 @@ class Report:
             entries[metric_name] = dict()
             entries[metric_name][model_name] = content
         self.entries = entries
+
+    def add_multiple_entries(self,new_entries):
+        entries = self.entries
+        updated_entries = update(entries,new_entries)
+        self.entries = updated_entries
 
     def write_report(self):
         project_settings = self.project_settings

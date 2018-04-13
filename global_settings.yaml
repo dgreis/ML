@@ -8,9 +8,11 @@ model_facet_defaults:
         feature_engineering: []
         select_before_eng: False
         feature_selection: []
-    cross_validation_settings: None
+    hyperparam_tuning_settings: None
+    evaluate_testset: False
 
-
+assessment:
+  cv_num_folds: 5
 
 metrics:
   binary-classification:

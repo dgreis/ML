@@ -41,11 +41,8 @@ class TransformChain(Manipulator):
                 pass
         return transform_settings
 
-    def fit_transform(self, X_mat,train=True):
-        if train == True:
-            log_prefix = "[Train]"
-        else:
-            log_prefix = "[Test]"
+    def fit_transform(self, X_mat,dataset_name="Train"):
+        log_prefix = "[" + dataset_name + "]"
         engineering_module = importlib.import_module('feature.engineering')
         transformations = self.transformations
         model_config = self.model_config
@@ -72,7 +69,7 @@ class TransformChain(Manipulator):
                 X_transform, updated_col_map = transformer.combine_and_reindex(X_touched, X_untouched
                                                                     ,working_features, new_feat_names)
                 self._set_working_features(updated_col_map)
-                if train == True:
+                if dataset_name == "Train":
                     self._output_features(transformer_name)
                     self._update_working_data_feature_names_ref(slugify(transformer_name))
                     if transformer.store:

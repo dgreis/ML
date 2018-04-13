@@ -31,26 +31,39 @@ def main():
         model_config = model_configs['Models'][model_name]
         model_config['model_name'] = model_name
         data = chef.prepare_final_model_dataset(model_config, project_settings)
-        X_train, y_train, X_test, y_test = data['X_train'], data['y_train'], data['X_test'], data['y_test']
-        print "Data Finalized. Training data with " + str(len(X_train)) + " samples. Test data with " + str(len(X_test)) + \
-              " samples and " + str(X_train.shape[1]) + " features."
+        X_train_val, y_train_val = data['X_train_val'], data['y_train_val']
+        X_train, X_val, y_train, y_val = data['X_train'], data['X_val'], data['y_train'], data['y_val']
+        X_test, y_test = data['X_test'], data['y_test']
+        print "Data Finalized. Training data with " + str(len(X_train)) + " samples. Validation data with " +\
+              str(len(X_val)) + " samples. Test data with " + str(len(X_test)) + \
+              " samples and " + str(X_test.shape[1]) + " features."
         model = models[model_name]
-        if model_config['cross_validation_settings'] != None:
-            validator = Cross_Validator(model_config)
-            validator.perform_cross_validation(X_train, y_train, model, model_config)
-            model = validator.set_optimal_hyperparams(model)
-        print "Next Step: Fit Model"
-        model.fit(X_train,y_train)
+        cv = CrossValidator(model_config, project_settings)
+        if cv.tune_hyperparams:
+            print "\tTuning hyper-params via cross-validation..."
+            cv.tune_hyperparams_via_cv(X_train_val, y_train_val, model)
+            model = cv.set_optimal_hyperparams(model)
+        print "Next Step: estimate generalization error for some metrics using CV"
+        num_folds = project_settings['assessment']['cv_num_folds']
+        entries = cv.perform_cross_validation(X_train_val, y_train_val, model, num_folds, model_name)
+        averaged_entries = cv.average_entries(entries)
+        report.add_multiple_entries(averaged_entries)
+        print "Next Step: estimate remaining metrics using validation set."
+        model.fit(X_train, y_train)
         if model.gen_output_flag == True:
             model.gen_output()
-        assert 1 == 1
         print 'Model Fit. Next Step: Perform Model Evaluation'
-        y_pred = model.predict(X_test)
+        y_pred = model.predict(X_val)
         evaluation_battery = load_evaluation_battery(project_settings)
-        for metric_name in evaluation_battery:
-            metric_class = evaluation_battery[metric_name]['class']
-            kwargs = evaluation_battery[metric_name]['kwargs']
-            report.add_entry(metric_name, model_name, metric_class(y_pred, y_test,**kwargs))
+        non_cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] != 'column'}
+        for metric_name in non_cv_battery:
+            metric_class = non_cv_battery[metric_name]['class']
+            kwargs = non_cv_battery[metric_name]['kwargs']
+            report.add_entry(metric_name, model_name, metric_class(y_pred, y_val,**kwargs))
+        if model_config['evaluate_testset']:
+            y_pred = model.predict(X_test)
+            raise NotImplementedError
+            #TODO: implement this in Report
         i += 1
     print "All Models Fit and Evaluated. Writing Report"
     report.write_report()
