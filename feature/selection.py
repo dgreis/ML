@@ -127,7 +127,7 @@ class l1_based(Filter):
         Filter.__init__(self,model_config)
         self.l1_settings = self.fetch_filter_settings('l1_based')
 
-    def apply(self,X_train,y_train):
+    def apply(self,X_mat,y_train):
         l1_settings = self.l1_settings
         method = l1_settings['method']
         kwargs = l1_settings['kwargs']
@@ -136,12 +136,12 @@ class l1_based(Filter):
             l1_model = LinearSVC(**kwargs)
         else:
             raise NotImplementedError
-        l1_model.fit(X_train,y_train)
+        l1_model.fit(X_mat,y_train)
         s = pd.Series(l1_model.coef_.sum(0))
         nonzero_features = s[s>0].index.tolist()
         #model = SelectFromModel(l1_model,prefit=True) #This is not the same as the way I'm implementing it!
         #X_filt = pd.DataFrame(model.transform(X_train))
-        X_filt = X_train.iloc[:,nonzero_features]
+        X_filt = X_mat.iloc[:,nonzero_features]
         return X_filt
 
 class tree_based(Filter):
@@ -150,17 +150,17 @@ class tree_based(Filter):
         Filter.__init__(self,model_config)
         self.tree_based_settings = self.fetch_filter_settings('tree_based') #TODO: Make more like Transform constructor
 
-    def apply(self,X_train,y_train,project_settings):
+    def apply(self,X_mat,y_train,project_settings):
 
         tree_based_settings = self.tree_based_settings
         tree_based_settings['model_name'] = 'tree-based-feature-selection' #TODO: add this onto existing model name
         clf = Decision_Tree_Classifier(tree_based_settings,project_settings)
-        clf = clf.fit(X_train, y_train)
+        clf = clf.fit(X_mat, y_train)
         if clf.gen_output_flag:
             clf.gen_output()
 
         model = SelectFromModel(clf, prefit=True)
-        X_filt = pd.DataFrame(model.transform(X_train))
+        X_filt = pd.DataFrame(model.transform(X_mat))
         return X_filt
 
 class recursive_feature_elimination(Filter):
@@ -170,7 +170,7 @@ class recursive_feature_elimination(Filter):
         self.rfe_settings = self.fetch_filter_settings('recursive_feature_elimination')
 
 
-    def apply(self,X_train,y_train):
+    def apply(self,X_mat,y_train):
         rfe_settings = self.rfe_settings
         kwargs = rfe_settings['kwargs']
         #estimator_class_name = kwargs['estimator']

@@ -35,7 +35,7 @@ class Chef:
 
         X_train_abs_filepath = data_dir + '/' + X_mat_rel_filepaths["X_train"]
         X_train = pd.read_csv(X_train_abs_filepath, sep="\s+", engine='python', header=None)
-        y_train = data['y_train_val']
+        y_train = data['y_train']
 
         transformations = model_config['feature_settings']['feature_engineering']
         filters = model_config['feature_settings']['feature_selection']
