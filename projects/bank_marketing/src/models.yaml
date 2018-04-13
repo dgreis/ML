@@ -1,26 +1,19 @@
 Models:
 
-  #Logistic Regression Base:
-  #  base_algorithm: sklearn.linear_model.LogisticRegression
-
-  Logistic Regression NormFeats:
+  Logistic Regression Base:
     base_algorithm: sklearn.linear_model.LogisticRegression
-    hyperparam_tuning_settings:
-      hyperparams:
-        C: "[0.1, 1, 10]"
-      num_folds: 5
-      eval_metric: "f1_score"
+
+  Logistic Regression Interactions:
+    base_algorithm: sklearn.linear_model.LogisticRegression
     feature_settings:
       feature_engineering:
-        - normalize:
-            inclusion_patterns:
-              - campaign
         - interaction_terms:
             interactions:
-              - ("job","month")
-   #         kwargs:
-   #           interaction_only: True
-   #           include_bias: False
+              - ("job", "month")
+              - ("job", "marital")
+              - ("job", "poutcome")
       feature_selection:
-        - exclusion_patterns:
-          - pdays
+        - l1_based:
+            method: "LinearSVC"
+            kwargs:
+              dual: False
