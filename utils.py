@@ -91,3 +91,10 @@ def load_working_file_filepath(project_settings, data_ref):
 def load_inv_column_map(filepath):
     df = pd.read_csv(filepath, sep="\s+", engine='python', names=['col_name'])
     return pd.Series(df.index, index=df.col_name).to_dict()
+
+
+def load_clean_input_file_filepath(project_settings, data_ref):
+    cif_rel_filepath = project_settings['clean_input_files'][data_ref]
+    data_dir = find_data_dir(project_settings)
+    cif_abs_filepath = data_dir + '/' + cif_rel_filepath
+    return cif_abs_filepath

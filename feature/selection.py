@@ -1,15 +1,11 @@
 import pandas as pd
 import importlib
-import inspect
 
 from manipulator import Manipulator
 from utils import flip_dict
 from algorithms.classification import Decision_Tree_Classifier
-from algorithms.regression import *
 
 from sklearn.svm import LinearSVC
-from sklearn.linear_model import Lasso
-from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import SelectFromModel
 from sklearn.feature_selection import RFECV
 
@@ -37,17 +33,22 @@ class FilterChain(Manipulator):
                 filter_name = d.keys()[0]
                 print "\t[Train] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
                 filter_class = getattr(selection_module,filter_name)
-                additional_args = self._get_args(filter_class)
-                filter = filter_class(model_config)
+                apply_args = self._get_args(filter_class, 'apply')
+                additional_args = filter(lambda x: x not in ['X_mat'], apply_args)
+                filter_instance = filter_class(model_config)
                 kwargs = dict()
                 for arg in additional_args:
                     kwargs[arg] = getattr(self,arg)
-                X_filt = filter.apply(X_filt,**kwargs)
+                X_filt = filter_instance.apply(X_filt,**kwargs)
                 i += 1
             working_features = self.working_features
             if working_features == None:
                 working_features = orig_col_map
-            updated_col_map = {idx: working_features[idx] for idx in X_filt.columns.tolist()}
+            ni = 0
+            updated_col_map = dict()
+            for oi in X_filt.columns.tolist():
+                updated_col_map[ni] = working_features[oi]
+                ni += 1
             self._set_working_features(updated_col_map)
             filt_num_feats = len(self.working_features)
             if filt_num_feats < init_num_feats:
@@ -57,33 +58,29 @@ class FilterChain(Manipulator):
                 print "\t\tNo features elminated in model selection process"
             self._output_features('selected-features')
             self._update_working_data_feature_names_ref('selected-features')
+        X_filt.columns = range(X_filt.shape[1])
         return X_filt
 
     def _pass_y_train_to_fc(self, y_train):
         self.y_train = y_train
-
-    def _get_args(self,filter_class):
-        args = getattr(inspect.getargspec(filter_class.apply),'args')
-        additional_args = args[2:]
-        return additional_args
 
     def transform(self, X_mat,original_columns=False):
         filters = self.filters
         if len(filters) > 0:
             print "\t[Test] Filtering selected features"
             working_features = self.working_features  # { ind : feat_name }
-            if not original_columns:
-                X_filt = X_mat.iloc[:, working_features.keys()]
-            else:
-                filt_indices = list()
-                inv_working_features = flip_dict(working_features)
-                orig_inv_col_map = self.inv_column_map
-                for col in inv_working_features:
-                    if orig_inv_col_map.has_key(col):
-                        filt_indices.append(inv_working_features[col])
-                    else:
-                        pass
-                X_filt = X_mat.iloc[:,filt_indices]
+            #if not original_columns:
+            #    X_filt = X_mat.iloc[:, working_features.keys()]
+            #else:
+            filt_indices = list()
+            inv_working_features = flip_dict(working_features)
+            orig_inv_col_map = self.inv_column_map
+            for col in inv_working_features:
+                if orig_inv_col_map.has_key(col):
+                    filt_indices.append(inv_working_features[col])
+                else:
+                    pass
+            X_filt = X_mat.iloc[:,filt_indices]
         else:
             X_filt = X_mat
         return X_filt
