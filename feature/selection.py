@@ -6,6 +6,7 @@ from utils import flip_dict
 from algorithms.classification import Decision_Tree_Classifier
 
 from sklearn.svm import LinearSVC
+from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import SelectFromModel
 from sklearn.feature_selection import RFECV
 
@@ -131,16 +132,16 @@ class l1_based(Filter):
         l1_settings = self.l1_settings
         method = l1_settings['method']
         kwargs = l1_settings['kwargs']
+        kwargs['penalty'] = 'l1'
         if method == "LinearSVC":
-            kwargs['penalty'] = 'l1'
             l1_model = LinearSVC(**kwargs)
+        elif method == "LogisticRegression":
+            l1_model = LogisticRegression(**kwargs)
         else:
             raise NotImplementedError
         l1_model.fit(X_mat,y_train)
         s = pd.Series(l1_model.coef_.sum(0))
-        nonzero_features = s[s>0].index.tolist()
-        #model = SelectFromModel(l1_model,prefit=True) #This is not the same as the way I'm implementing it!
-        #X_filt = pd.DataFrame(model.transform(X_train))
+        nonzero_features = s[abs(s) > 0.0001].index.tolist()
         X_filt = X_mat.iloc[:,nonzero_features]
         return X_filt
 
@@ -159,7 +160,11 @@ class tree_based(Filter):
         if clf.gen_output_flag:
             clf.gen_output()
 
-        model = SelectFromModel(clf, prefit=True)
+        if tree_based_settings['other_options'].has_key('selection_threshold'):
+            selection_threshold = tree_based_settings['other_options']['selection_threshold']
+        else:
+            selection_threshold = None
+        model = SelectFromModel(clf, prefit=True, threshold=selection_threshold)
         X_filt = pd.DataFrame(model.transform(X_mat))
         return X_filt
 
