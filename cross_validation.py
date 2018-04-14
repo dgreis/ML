@@ -31,6 +31,15 @@ class CrossValidator:
         return model
 
     def tune_hyperparams_via_cv(self,X_train, y_train, model):
+        """Example in models.yaml file:
+        Models:
+            Model Name:
+                hyperparam_tuning_settings:
+                    hyperparams:
+                        <param>: "[<va1l>, <val2>]"
+                    num_folds: <folds>
+                    eval_metric: <metric>
+        """
         grid = self.grid
         num_folds = self.hyperparam_cv_folds
         i = 0
@@ -43,7 +52,7 @@ class CrossValidator:
             model_name = str(setting)
             report_entries = self.perform_cross_validation(X_train,y_train,model,num_folds, model_name)
             i = i + num_folds
-            print "\tCV complete for (" + str(i) + "/" + str(num_folds*num_settings) + ") models"
+            print "\tCV complete (" + str(i) + "/" + str(num_folds*num_settings) + ") models"
             hyperparam_eval_metric = self.hyperparam_eval_metric
             scores = report_entries[hyperparam_eval_metric][str(setting)]
             cv_results[str(setting)] = scores
@@ -64,11 +73,13 @@ class CrossValidator:
         kf = KFold(num_folds)
         folds = list(kf.split(X_train,y_train))
         report_entries = dict()
+        f = 1
         for fold in folds:
             ind_dev, ind_val = fold[0], fold[1]
             X_dev,y_dev = X_train.loc[ind_dev,:], pd.Series(y_train).loc[ind_dev].tolist()
             X_val,y_val = X_train.loc[ind_val,:], pd.Series(y_train).loc[ind_val].tolist()
             model.fit(X_dev,y_dev)
+            print "\t" + "CV: fold (" + str(f) +"/"+str(num_folds) + ") fit"
             y_pred = model.predict(X_val)
             evaluation_battery = self.evaluation_battery
             cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] == 'column'}
@@ -78,6 +89,7 @@ class CrossValidator:
                 if not report_entries.has_key(metric_name):
                     report_entries[metric_name] = {model_name : []}
                 report_entries[metric_name][model_name].append(metric_class(y_pred, y_val, **kwargs))
+            f += 1
         return report_entries
 
     def average_entries(self,entries):
