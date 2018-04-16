@@ -1,3 +1,5 @@
+from __future__ import division
+
 import importlib
 import itertools
 import copy
@@ -41,11 +43,12 @@ class TransformChain(Manipulator):
                 pass
         return transform_settings
 
-    def fit_transform(self, X_mat,dataset_name="Train"):
+    def fit_transform(self,X_mat,y_mat,dataset_name="Train"):
         log_prefix = "[" + dataset_name + "]"
         engineering_module = importlib.import_module('feature.engineering')
         transformations = self.transformations
         model_config = self.model_config
+        self._pass_y_to_self(y_mat)
         i = 1
         if len(transformations) < 1:
             X_transform = X_mat
@@ -65,7 +68,12 @@ class TransformChain(Manipulator):
                 transformer_settings['model_name'] = model_config['model_name']
                 transformer = transform_class(transformer_settings)
                 X_touch, X_untouched = transformer.split(X_mat, working_features)
-                X_touched, new_feat_names = transformer.fit_transform(X_touch, working_features)
+                fit_transform_args = self._get_args(transform_class, 'fit_transform')
+                additional_args = filter(lambda x: x not in ['X_touch','working_features'], fit_transform_args)
+                kwargs = dict()
+                for arg in additional_args:
+                    kwargs[arg] = getattr(self, arg)
+                X_touched, new_feat_names = transformer.fit_transform(X_touch, working_features,**kwargs)
                 X_transform, updated_col_map = transformer.combine_and_reindex(X_touched, X_untouched
                                                                     ,working_features, new_feat_names)
                 self._set_working_features(updated_col_map)
@@ -125,8 +133,8 @@ class Transformer(object):
             X_touch = X_mat.loc[:,touch_indices]
         return X_touch, X_untouched
 
-    def fit_transform(self, X_touch, working_features):
-        X_touched = self.base_transformer.fit_transform(X_touch)
+    def fit_transform(self, X_touch, working_features,**kwargs):
+        X_touched = self.base_transformer.fit_transform(X_touch,working_features,**kwargs)
         orig_tcol_idx = X_touch.columns
         Xt_feat_names = self.gen_new_column_names(orig_tcol_idx, working_features)
         if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
@@ -239,8 +247,8 @@ class interaction_terms(TransformChain):
 
 class normalize(Transformer):
 
-    def __init__(self, transform_settings):
-        super(normalize,self).__init__(transform_settings)
+    def __init__(self, transformer_settings):
+        super(normalize, self).__init__(transformer_settings)
         self.set_base_transformer(Normalizer(**self.kwargs))
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
@@ -254,8 +262,8 @@ class normalize(Transformer):
 
 class standard_scale(Transformer):
 
-    def __init__(self, transform_settings):
-        super(standard_scale,self).__init__(transform_settings)
+    def __init__(self, transformer_settings):
+        super(standard_scale, self).__init__(transformer_settings)
         self.set_base_transformer(StandardScaler(**self.kwargs))
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
@@ -268,8 +276,8 @@ class standard_scale(Transformer):
 
 class pca(Transformer):
 
-    def __init__(self, transform_settings):
-        super(pca,self).__init__(transform_settings)
+    def __init__(self, transformer_settings):
+        super(pca, self).__init__(transformer_settings)
         self.set_base_transformer(PCA(**self.kwargs))
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
@@ -279,3 +287,54 @@ class pca(Transformer):
             new_col_name = 'pc_' + str(i)
             new_col_list.append(new_col_name)
         return new_col_list
+
+class loo_encoding(Transformer):
+    """Example in models.yaml file:
+        Models:
+          Model Name:
+           feature_settings:
+             feature_engineering:
+               - loo_encoding
+                   inclusion_patterns
+                     - <pattern>
+    """
+    def __init__(self,transformer_settings):
+        super(loo_encoding,self).__init__(transformer_settings)
+        self.set_base_transformer(LeaveOneOutEncoder(**self.kwargs))
+
+    def fit_transform(self, X_touch, working_features,y):
+        kwargs = dict()
+        kwargs['y'] = y
+        return super(loo_encoding, self).fit_transform(X_touch,working_features,**kwargs)
+
+    def gen_new_column_names(self, orig_tcol_idx, working_features):
+        inclusion_patterns = self.inclusion_patterns
+        assert len(inclusion_patterns) == 1
+        pattern = inclusion_patterns[0]
+        new_feature_name = 'loo(' + pattern  + ')'
+        return [new_feature_name]
+
+
+class LeaveOneOutEncoder:
+
+    def __init__(self):
+        pass
+
+    def fit_transform(self,X_mat, working_features, y):
+        loo_vals = list()
+        for j in X_mat.columns:
+            j_idx = X_mat[X_mat.loc[:,j] > 0].index
+            try:
+                yj = [y[ji] for ji in j_idx]
+            except IndexError:
+                pass
+            cat_sum = sum(yj)
+            cat_len = len(yj)
+            for i in j_idx:
+                y_loo_mean = (cat_sum-y[i]) / (cat_len - 1)
+                loo_vals.append(y_loo_mean)
+        assert len(loo_vals) == len(X_mat)
+        return pd.DataFrame(pd.Series(loo_vals))
+
+
+

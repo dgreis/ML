@@ -39,6 +39,9 @@ class Manipulator(object):
     #def fit(self,X_train,y_train=None):
     #    pass
 
+    def _pass_y_to_self(self, y):
+        self.y = y
+
     def fit_transform(self,X_train,y_train=None):
         pass
 

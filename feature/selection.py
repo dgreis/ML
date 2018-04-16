@@ -21,7 +21,7 @@ class FilterChain(Manipulator):
         selection_module = importlib.import_module('feature.selection')
         filters = self.filters
         model_config = self.model_config
-        self._pass_y_train_to_fc(y_train)
+        self._pass_y_to_self(y_train)
         X_filt = X_train
         orig_inv_col_map = self.inv_column_map
         orig_col_map = flip_dict(orig_inv_col_map)
@@ -61,9 +61,6 @@ class FilterChain(Manipulator):
             self._update_working_data_feature_names_ref('selected-features')
         X_filt.columns = range(X_filt.shape[1])
         return X_filt
-
-    def _pass_y_train_to_fc(self, y_train):
-        self.y_train = y_train
 
     def transform(self, X_mat,original_columns=False,dataset_name=None):
         filters = self.filters
@@ -116,10 +113,29 @@ class exclusion_patterns(Filter):
         col_names = inv_column_map.keys()
         exclusion_patterns = self.exclusion_patterns
         for pattern in exclusion_patterns:
-            pat_exclude_columns = filter(lambda x: pattern in x, col_names)
-            exclude_columns = exclude_columns + pat_exclude_columns
+            len_pat = len(pattern)
+            pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
+            exclude_columns = exclude_columns + pattern_begin_cols
         exclude_indices = [int(inv_column_map[col_name]) for col_name in exclude_columns]
         X_mat_filt = X_mat.drop(axis=1,labels=exclude_indices)
+        return X_mat_filt
+
+class inclusion_patterns(Filter):
+
+    def __init__(self,model_config):
+        super(inclusion_patterns,self).__init__(model_config)
+        self.inclusion_patterns = self.fetch_filter_settings('inclusion_patterns')
+
+    def apply(self, X_mat, inv_column_map):
+        include_columns = list()
+        col_names = inv_column_map.keys()
+        inclusion_patterns = self.inclusion_patterns
+        for pattern in inclusion_patterns:
+            len_pat = len(pattern)
+            pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
+            include_columns = include_columns + pattern_begin_cols
+        include_indices = [int(inv_column_map[col_name]) for col_name in include_columns]
+        X_mat_filt = X_mat.loc[:,include_indices]
         return X_mat_filt
 
 class l1_based(Filter):
@@ -186,5 +202,5 @@ class recursive_feature_elimination(Filter):
         remaining_kwargs_keys = filter(lambda x: x not in ['estimator'],kwargs.keys())
         remaining_kwargs = {k: kwargs[k] for k in remaining_kwargs_keys}
         selector = RFECV(estimator,**remaining_kwargs)
-        X_filt = selector.fit_transform(X_train,y_train)
+        X_filt = selector.fit_transform(X_mat,y_train)
         return pd.DataFrame(X_filt)

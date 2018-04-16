@@ -36,6 +36,7 @@ class Chef:
         X_train_abs_filepath = data_dir + '/' + X_mat_rel_filepaths["X_train"]
         X_train = pd.read_csv(X_train_abs_filepath, sep="\s+", engine='python', header=None)
         y_train = data['y_train']
+        y_train_val = data['y_train_val']
 
         transformations = model_config['feature_settings']['feature_engineering']
         filters = model_config['feature_settings']['feature_selection']
@@ -43,9 +44,9 @@ class Chef:
         if model_config['feature_settings']['select_before_eng']:
             fc = FilterChain(filters, model_config, project_settings)
             X_train_1st = fc.fit_transform(X_train, y_train)
-            X_train_2nd = TransformChain(transformations, model_config, project_settings).fit_transform(X_train_1st)
+            X_train_2nd = TransformChain(transformations, model_config, project_settings).fit_transform(X_train_1st,y_train)
         else:
-            X_train_1st = TransformChain(transformations, model_config, project_settings).fit_transform(X_train)
+            X_train_1st = TransformChain(transformations, model_config, project_settings).fit_transform(X_train,y_train)
             fc = FilterChain(filters, model_config, project_settings)
             X_train_2nd = fc.fit_transform(X_train_1st, y_train)
 
@@ -53,13 +54,14 @@ class Chef:
 
         X_val_abs_filepath = data_dir + '/' + X_mat_rel_filepaths["X_val"]
         X_val = pd.read_csv(X_val_abs_filepath, sep="\s+", engine='python', header=None)
+        y_val = data['y_val']
         if model_config['feature_settings']['select_before_eng']:
             X_val_1st = fc.transform(X_val, original_columns=True,dataset_name='Val')
             X_val_2nd = TransformChain(transformations, model_config, project_settings,
-                                        original_columns=True).fit_transform(X_val_1st, dataset_name="Val")
+                                        original_columns=True).fit_transform(X_val_1st,y_val, dataset_name="Val")
         else:
             X_val_1st = TransformChain(transformations, model_config, project_settings,
-                                        original_columns=True).fit_transform(X_val, dataset_name="Val")
+                                        original_columns=True).fit_transform(X_val,y_val, dataset_name="Val")
             X_val_2nd = fc.transform(X_val_1st,dataset_name='Val')
 
         assert X_train_2nd.shape[1] == X_val_2nd.shape[1]
@@ -71,10 +73,10 @@ class Chef:
         if model_config['feature_settings']['select_before_eng']:
             X_train_val_1st = fc.transform(X_train_val, original_columns=True,dataset_name="Train_val")
             X_train_val_2nd = TransformChain(transformations, model_config, project_settings,
-                                        original_columns=True).fit_transform(X_train_val_1st, dataset_name="Train_val")
+                                        original_columns=True).fit_transform(X_train_val_1st,y_train_val, dataset_name="Train_val")
         else:
             X_train_val_1st = TransformChain(transformations, model_config, project_settings,
-                                        original_columns=True).fit_transform(X_train_val, dataset_name="Train_val")
+                                        original_columns=True).fit_transform(X_train_val,y_train_val,dataset_name="Train_val")
             X_train_val_2nd = fc.transform(X_train_val_1st,dataset_name="Train_val")
 
         assert X_train_2nd.shape[1] == X_train_val_2nd.shape[1]
@@ -83,13 +85,14 @@ class Chef:
 
         X_test_abs_filepath = data_dir + '/' + X_mat_rel_filepaths["X_test"]
         X_test = pd.read_csv(X_test_abs_filepath, sep="\s+", engine='python', header=None)
+        y_test = data['y_test']
         if model_config['feature_settings']['select_before_eng']:
             X_test_1st = fc.transform(X_test, original_columns=True,dataset_name="Test")
             X_test_2nd = TransformChain(transformations, model_config, project_settings,
-                                        original_columns=True).fit_transform(X_test_1st, dataset_name="Test")
+                                        original_columns=True).fit_transform(X_test_1st,y_test, dataset_name="Test")
         else:
             X_test_1st = TransformChain(transformations, model_config, project_settings,
-                                        original_columns=True).fit_transform(X_test, dataset_name="Test")
+                                        original_columns=True).fit_transform(X_test, y_test, dataset_name="Test")
             X_test_2nd = fc.transform(X_test_1st,dataset_name='Test')
 
         assert X_train_2nd.shape[1] == X_test_2nd.shape[1]
