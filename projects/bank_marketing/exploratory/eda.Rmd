@@ -7,21 +7,61 @@ output: html_notebook
 bank_input = "~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/bank-full.csv"
 addl_input = "~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank-additional/bank-additional-full.csv"
 df = read.csv(bank_input,sep=";")
-df$month = factor(df$month,levels=c("jan","feb","mar","apr","may","jun","jul","aug",
-                                    "sep","oct","nov","dec"))
 
 df$outcome = ifelse(df$y=='yes',1,0)
 df = df[,!(names(df) %in% c('y'))]
-
-mycolSums<-function(x){
-  return(x/sum(x))
-}
 
 ```
 The major difference between the two datasets is that the `bank-addtional` has some macro-economic indicators.
 
 ```{r}
-m = glm(outcome~.,data=df,family='binomial')
+
+mycolSums<-function(x){
+  return(x/sum(x))
+}
+
+X_train = read.csv("~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/processed/X_train.txt",sep='\t',header=FALSE)
+y_train = read.csv("~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/processed//y_train.txt",sep="\t",header=FALSE)
+feature_names = read.csv("~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/processed/features.txt",sep='\t',header=FALSE)
+
+df = X_train
+names(df) = as.character(feature_names[,1])
+df[,'outcome'] = y_train[,1]
+
+for (col in c("job_","month_","marital_","poutcome_","default_",
+              "loan_","education_","housing_","contact_")){
+  d = df[,grep(col,names(df))]
+  df = df[,!(names(df) %in% grep(col,names(df),value=T))]
+  w = which(d==1,arr.ind = T)
+  col_name = strsplit(col,'_')[[1]]
+  df[,col_name] <-(names(d)[w[order(w[,1]),2]])
+  df[,col_name] <- sapply(strsplit(df[,col_name],"_"), `[`, 2)
+}
+
+df$month = factor(df$month,levels=c("jan","feb","mar","apr","may","jun","jul","aug",
+                                    "sep","oct","nov","dec"))
+
+X_val = read.csv("~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/processed/X_val.txt",sep='\t',header=FALSE)
+y_val = read.csv("~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/processed/y_val.txt",sep="\t",header=FALSE)
+
+vdf = X_val
+names(vdf) = as.character(feature_names[,1])
+vdf[,'outcome'] = y_val[,1]
+
+for (col in c("job_","month_","marital_","poutcome_","default_",
+              "loan_","education_","housing_","contact_")){
+  d = vdf[,grep(col,names(vdf))]
+  vdf = vdf[,!(names(df) %in% grep(col,names(vdf),value=T))]
+  w = which(d==1,arr.ind = T)
+  col_name = strsplit(col,'_')[[1]]
+  vdf[,col_name] <-(names(d)[w[order(w[,1]),2]])
+  vdf[,col_name] <- sapply(strsplit(vdf[,col_name],"_"), `[`, 2)
+}
+
+```
+
+```{R}
+m = cv.glmnet(as.matrix(X_train),as.factor(y_train[,1]),family='binomial',type.measure = 'class')
 summary(m)
 ```
 
@@ -30,6 +70,13 @@ codf = data.frame(summary(m)$coef)
 sigdf = codf[codf[,'Pr...z..'] <0.05,]
 sigdf[order(sigdf$Estimate,decreasing = T),]
 ```
+```{r}
+vdf$yhat = ifelse(predict(m,as.matrix(X_val),type='response') > 0.5, 1, 0)
+table(vdf$yhat,vdf$outcome)
+```
+
+
+
 
 ```{r}
 with(df,plot(factor(outcome) ~ factor(month)))
@@ -43,7 +90,7 @@ t/rowSums(t)
 Way more likely to succeed in mar and dec
 
 ```{r}
-with(df,plot(job ~ month))
+with(df,plot(factor(job)~ factor(month)))
 ```
 ```{R}
 apply(table(df$job,df$month),2,mycolSums)
@@ -67,3 +114,16 @@ summary(glm(outcome~marital*job,data=df,family='binomial'))
 ```
 
 I think I'll try an interaction term there as well.
+
+
+## Try code with bayesian stuff
+
+toy data
+```{r}
+x = rep(1:5,6)
+y = rep(1:0,15)
+seg = rep(1:5,6)
+df = data.frame(x=x,y=y,seg=seg)
+
+probabilize_high_card_cat(df,y,x)
+```

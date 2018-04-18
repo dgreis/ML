@@ -1,19 +1,67 @@
 Models:
 
-  Logistic Regression Base:
+  Logistic Regression:
     base_algorithm: sklearn.linear_model.LogisticRegression
 
-  Logistic Regression Interactions:
-    base_algorithm: sklearn.linear_model.LogisticRegression
-    feature_settings:
-      feature_engineering:
-        - interaction_terms:
-            interactions:
-              - ("job", "month")
-              - ("job", "marital")
-              - ("job", "poutcome")
-      feature_selection:
-        - l1_based:
-            method: "LinearSVC"
-            kwargs:
-              dual: False
+  SVM:
+    base_algorithm: sklearn.svm.SVC
+    hyperparam_tuning_settings:
+      hyperparams:
+        kernel: "['linear','rbf', 'sigmoid']"
+      num_folds: 5
+      eval_metric: 'f1_score'
+
+  Naive Bayes:
+    base_algorithm: sklearn.naive_bayes.GaussianNB
+
+  DT:
+    base_algorithm: sklearn.tree.DecisionTreeClassifier
+
+  Random Forest:
+    base_algorithm: sklearn.ensemble.RandomForestClassifier
+
+  ADABoost:
+    base_algorithm: sklearn.ensemble.AdaBoostClassifier
+
+  GBC:
+    base_algorithm: sklearn.ensemble.GradientBoostingClassifier
+
+  NN:
+    base_algorithm: sklearn.neural_network.MLPClassifier
+
+
+
+ # Logistic Regression L1-Reg:
+ #   base_algorithm: sklearn.linear_model.LogisticRegression
+ #   hyperparam_tuning_settings:
+ #     hyperparams:
+ #       penalty: "['l1','l2']"
+ #     eval_metric: 'f1_score'
+ #     num_folds: 5
+ #   feature_settings:
+ #     feature_engineering:
+ #       - interaction_terms:
+ #           interactions:
+ #             - ("month", "job")
+
+ # ElasticNet:
+ #   base_algorithm: sklearn.linear_model.SGDClassifier
+ #   keyword_arg_settings:
+ #     penalty: "elasticnet"
+ #     loss: "hinge"  #CV
+
+ # SVM:
+ #   base_algorithm: sklearn.svm.SVC
+ #   hyperparam_tuning_settings:
+ #     hyperparams:
+ #       C: "[0.1,1,10]"
+ #     num_folds: 5
+ #     eval_metric: 'f1_score'
+
+  #GBM Base:
+  #  base_algorithm: sklearn.ensemble.GradientBoostingClassifier
+  #  hyperparam_tuning_settings:
+  #    hyperparams:
+  #      n_estimators: "[50, 100, 150]"
+  #    num_folds: 3
+  #    eval_metric: "f1_score"
