@@ -6,6 +6,7 @@
 *.names
 *.zip
 *.nb.html
+*.pdf
 projects/*/data
 projects/*/evaluation
 projects/*/model_artifacts
