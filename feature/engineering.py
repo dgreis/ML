@@ -2,13 +2,11 @@ from __future__ import division
 
 import importlib
 import itertools
-import copy
-import os
 
 import pandas as pd
 
 from manipulator import ManipulatorChain, Manipulator
-from utils import flip_dict, find_project_dir, load_inv_column_map, load_clean_input_file_filepath
+from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import StandardScaler
@@ -20,7 +18,7 @@ class TransformChain(ManipulatorChain):
 
     def __init__(self,starting_transformations, model_config, project_settings,original_columns=False):
         updated_transformations = list()
-        model_config['feature_settings']['t_order'] = 0
+        model_config['feature_settings']['order'] = -1
         engineering_module = importlib.import_module('feature.engineering')
         for transformation in starting_transformations:
             engineering_module = importlib.import_module('feature.engineering')
@@ -29,46 +27,37 @@ class TransformChain(ManipulatorChain):
             if transform_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
                 transform_chain_class = transform_class
                 tc = transform_chain_class(starting_transformations,model_config,project_settings,original_columns)
-                updated_transformations = updated_transformations + tc.transformations
+                updated_transformations = tc.transformations
             else:
                 transformer_name = transformation.keys()[0]
                 transformer_class_name = transformer_name.split('.')[-1:][0]
                 transform_class = getattr(engineering_module, transformer_class_name)
+                model_config['feature_settings']['order'] += 1
                 transformer = transform_class(model_config, project_settings)
                 transformation[transformer_name]['initialized_transformer'] = transformer
                 updated_transformations = updated_transformations + [transformation]
-                #expanded_model_config = copy.deepcopy(model_config)
-            #model_config['feature_settings']['feature_engineering'] = updated_transformations
         super(TransformChain,self).__init__(updated_transformations, model_config, project_settings,original_columns)
         self.transformations = updated_transformations
 
+    def det_prior_feature_names_filepath(self,model_config):
+        pass
+
     def transform(self,X_mat,y_mat,dataset_name="Train"):
         log_prefix = "[" + dataset_name + "]"
-        #engineering_module = importlib.import_module('feature.engineering')
         transformations = self.transformations
-        model_config = self.model_config
-        project_settings = self.project_settings
         self._pass_y_to_self(y_mat)
         i = 1
         if len(transformations) < 1:
             X_transform = X_mat
         else:
             for d in transformations:
-                #working_features = self.working_features
-                #if working_features is None:
-                #    inv_column_map = self.inv_column_map
-                #    working_features = flip_dict(inv_column_map)
                 transformer_name = d.keys()[0]
-                #transformer_class_name = transformer_name.split('.')[-1:][0]
                 print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
                     len(transformations)) + "): " + transformer_name
-                #transform_class = getattr(engineering_module, transformer_class_name)
-                #transformer = transform_class(model_config, project_settings)
                 transformer = d[transformer_name]['initialized_transformer']
                 transformer.fit(X_mat,y_mat)
                 X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat,y_mat)
                 X_touched, y_touched = transformer.transform(X_touch,y_touch)
-                #X_touch, X_untouched = transformer.split(X_mat, working_features)
                 #fit_transform_args = self._get_args(transform_class, 'fit_transform')
                 #additional_args = filter(lambda x: x not in ['X_touch','working_features'], fit_transform_args)
                 #kwargs = dict()
@@ -76,11 +65,7 @@ class TransformChain(ManipulatorChain):
                 #    kwargs[arg] = getattr(self, arg)
                 #X_touched, new_feat_names = transformer.fit_transform(X_touch, working_features,**kwargs)
                 X_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched)
-                #self._set_working_features(updated_col_map)
                 if dataset_name == "Train":
-                    #self._output_features(transformer_name)
-                    #transformer.output_features()
-                    #self._update_working_data_feature_names_ref(slugify(transformer_name))
                     if transformer.store:
                         artifact_dir = self.artifact_dir
                         transformer.store_output(X_transform,output_dir=artifact_dir)
@@ -92,14 +77,11 @@ class TransformChain(ManipulatorChain):
 class Transformer(Manipulator):
 
     def __init__(self, model_config, project_settings):
-        super(Transformer,self).__init__(model_config,project_settings)
-        self.base_transformer = None
-        transformations = model_config['feature_settings']['feature_engineering']
-        transformer_names = [d.keys()[0] for d in transformations]
-        t_order = model_config['feature_settings']['t_order']
-        transformer_name = transformer_names[t_order]
-        self.transformer_name = transformer_name
+        manipulations = model_config['feature_settings']['feature_engineering']
+        super(Transformer,self).__init__(model_config,project_settings,manipulations)
+        transformer_name = self.manipulator_name
         transformer_settings = self.fetch_transform_settings(model_config,transformer_name)
+        self.base_transformer = None
         if transformer_settings.has_key('kwargs'):
             kwargs = transformer_settings['kwargs']
         else:
@@ -110,26 +92,32 @@ class Transformer(Manipulator):
         else:
             self.store = False
         self.inclusion_patterns = transformer_settings['inclusion_patterns']
-        if t_order == 0:
-            prior_transform_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-        else:
-            prior_transform = transformer_names[t_order-1]
-            prior_transform_feature_names_filepath = self._det_output_features_filepath(prior_transform)
-        self.prior_transform_feature_names_filepath = prior_transform_feature_names_filepath
 
-    def tbd(self):
-        prior_transform_feature_names_filepath = self.prior_transform_feature_names_filepath
-        model_config = self.model_config
+    def det_prior_feature_names_filepath(self,model_config):
+        project_settings = self.project_settings
+        if not model_config['feature_settings']['select_before_eng']:
+            prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+        else:
+            filters = model_config['feature_settings']['feature_selection']
+            num_filters = len(filters)
+            if num_filters > 0:
+                last_filter_name = filters[-1:][0].keys()[0]
+                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(last_filter_name)
+            else:
+                prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings,'feature_names')
+        return prior_manipulator_feature_names_filepath
+
+    def configure_ancestors_and_features(self):
+        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
         prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
         prior_features = flip_dict(prior_inv_col_map)
         touch_indices, untouched_indices = self.determine_split_indices(prior_features)
         new_features = self.gen_new_column_names(touch_indices, prior_features)
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
-        new_feature_set = self.reindex(prior_features,new_features)
+        new_feature_set = self.reindex(prior_features, new_features)
         self.features = new_feature_set
         self.output_features()
-        model_config['feature_settings']['t_order'] += 1
 
     def fetch_transform_settings(self,model_config, transformer_name):
         feature_eng_settings = model_config['feature_settings']['feature_engineering']
@@ -169,15 +157,6 @@ class Transformer(Manipulator):
             untouched_indices = untouched_indices
         return touch_indices, untouched_indices
 
-    def split(self, X_mat, y):
-        untouched_indices = self.untouched_indices
-        touch_indices = self.touch_indices
-        X_untouched = X_mat.loc[:,untouched_indices]
-        y_untouched = [y[i] for i in untouched_indices]
-        X_touch = X_mat.loc[:,touch_indices]
-        y_touch = [y[i] for i in touch_indices]
-        return X_touch, X_untouched, y_touch, y_untouched
-
     def transform(self, X_touch, y_touch, **kwargs):
         X_touched = self.base_transformer.fit_transform(X_touch,**kwargs)
         if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
@@ -204,31 +183,13 @@ class Transformer(Manipulator):
         output_file_name = slugify(model_name + '-' + transform_name)
         X_mat.to_csv(output_dir + '/' + output_file_name + '.txt', header=False, index=False, sep='\t')  # TODO: fix this when I move out of pandas
 
-    def reindex(self, prior_features, new_features):
-        untouched_indices = self.untouched_indices
-        new_col_map = dict()
-        ni = 0
-        for oi in untouched_indices:
-            col_name = prior_features[oi]
-            new_col_map[ni] = col_name
-            ni += 1
-        reindexed_col_idx = list()
-        for feature in new_features:
-            new_col_map[ni] = feature
-            reindexed_col_idx.append(ni)
-            ni += 1
-        assert ni == len(new_features) + len(untouched_indices)
-        return new_col_map
-
-    def gen_new_column_names(self, orig_tcol_idx, working_features):
-        raise NotImplementedError
 
 class basis_expansion(Transformer):
 
     def __init__(self, model_config, project_settings):
         super(basis_expansion, self).__init__(model_config, project_settings)
         self.set_base_transformer(PolynomialFeatures(**self.kwargs))
-        self.tbd()
+        self.configure_ancestors_and_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         tuples = list()
@@ -256,7 +217,7 @@ class basis_expansion(Transformer):
 class interaction_terms(TransformChain):
 
     def __init__(self,transformations, model_config, project_settings,original_columns):
-        Manipulator.__init__(self,model_config,project_settings)
+        Manipulator.__init__(self,model_config,project_settings,transformations)
         raw_interaction_strs = filter(lambda x: x.keys()[0] == 'interaction_terms',  transformations)[0]['interaction_terms']['interactions']
         compact_interactions = [eval(ris) for ris in raw_interaction_strs]
         expanded_transformations = list()
@@ -296,7 +257,7 @@ class normalize(Transformer):
     def __init__(self, model_config, project_settings):
         super(normalize, self).__init__(model_config, project_settings )
         self.set_base_transformer(Normalizer(**self.kwargs))
-        self.tbd()
+        self.configure_ancestors_and_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         Xt_feat_names = list()

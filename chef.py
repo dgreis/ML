@@ -43,14 +43,16 @@ class Chef:
 
         if model_config['feature_settings']['select_before_eng']:
             fc = FilterChain(filters, model_config, project_settings)
-            X_train_1st = fc.fit_transform(X_train, y_train)
+            fc.fit(X_train, y_train)
+            X_train_1st = fc.transform(X_train,dataset_name="Train")
             tc = TransformChain(transformations,model_config,project_settings)
             X_train_2nd = tc.transform(X_train_1st,y_train)
         else:
             tc = TransformChain(transformations,model_config,project_settings)
             X_train_1st = tc.transform(X_train,y_train)
             fc = FilterChain(filters, model_config, project_settings)
-            X_train_2nd = fc.fit_transform(X_train_1st, y_train)
+            fc.fit(X_train_1st, y_train)
+            X_train_2nd = fc.transform(X_train_1st,dataset_name="Train")
 
         data['X_train'] = X_train_2nd
 

@@ -11,7 +11,7 @@ from utils import find_project_dir, load_working_file_filepath, load_inv_column_
 
 class Manipulator(object):
 
-    def __init__(self,model_config, project_settings):
+    def __init__(self,model_config, project_settings,manipulations):
         super(Manipulator,self).__init__()
         self.model_config = model_config
         self.project_settings = project_settings
@@ -21,6 +21,23 @@ class Manipulator(object):
             os.makedirs(artifact_dir)
         self.artifact_dir = artifact_dir
         self.features = None
+        if len(manipulations) > 0:
+            manipulator_names = [d.keys()[0] for d in manipulations]
+            order = model_config['feature_settings']['order']
+            if order == 0:
+                #prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+                prior_manipulator_feature_names_filepath = self.det_prior_feature_names_filepath(model_config)
+            else:
+                prior_transform = manipulator_names[order-1]
+                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_transform)
+            self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
+            manipulator_name = manipulator_names[order]
+            self.manipulator_name = manipulator_name
+        else:
+            pass
+
+    def det_prior_feature_names_filepath(self,model_config):
+        raise NotImplementedError
 
     def _det_output_features_filepath(self,manipulator_name):
         model_config = self.model_config
@@ -31,33 +48,60 @@ class Manipulator(object):
         return output_features_filepath
 
     def output_features(self):
-        #class_name = str(self.__class__).split('.')[-1:][0]
-        #TODO: fix this is, this is really bad
-        manipulator_name = self.transformer_name
+        manipulator_name = self.manipulator_name
         if self.features is None:
             raise Exception
         output_features_filepath = self._det_output_features_filepath(manipulator_name)
         pd.Series(self.features).to_csv(output_features_filepath, index=False, sep='\t')
 
+    def gen_new_column_names(self, orig_tcol_idx, working_features):
+        raise NotImplementedError
+
+    def split(self, X_mat, y):
+        untouched_indices = self.untouched_indices
+        touch_indices = self.touch_indices
+        X_untouched = X_mat.loc[:,untouched_indices]
+        y_untouched = [y[i] for i in untouched_indices]
+        X_touch = X_mat.loc[:,touch_indices]
+        y_touch = [y[i] for i in touch_indices]
+        return X_touch, X_untouched, y_touch, y_untouched
+
+    def reindex(self, prior_features, new_features=list()):
+        untouched_indices = self.untouched_indices
+        new_col_map = dict()
+        ni = 0
+        for oi in untouched_indices:
+            col_name = prior_features[oi]
+            new_col_map[ni] = col_name
+            ni += 1
+        reindexed_col_idx = list()
+        for feature in new_features:
+            new_col_map[ni] = feature
+            reindexed_col_idx.append(ni)
+            ni += 1
+        assert ni == len(new_features) + len(untouched_indices)
+        return new_col_map
+
 
 class ManipulatorChain(Manipulator):
 
     def __init__(self, manipulations, model_config, project_settings,original_columns):
-        super(ManipulatorChain, self).__init__(model_config,project_settings)
+        super(ManipulatorChain, self).__init__(model_config,project_settings, manipulations)
 
-        self.working_features = None
+        #self.working_features = None
+        #artifact_dir = self.artifact_dir
 
-        if original_columns == False:
-            feature_names_filepath = load_working_file_filepath(self.project_settings, 'feature_names')
-        else:
-            if model_config['feature_settings']['select_before_eng']:
-                feature_names_filepath = artifact_dir + '/' + slugify(model_config['model_name']) +\
-                                         '-selected-features-features.txt'
-            else:
-                feature_names_filepath = load_clean_input_file_filepath(self.project_settings, 'feature_names')
-        inv_column_map = load_inv_column_map(feature_names_filepath)
-        self.inv_column_map = inv_column_map
-        self.original_columns = original_columns
+        #if original_columns == False:
+        #    feature_names_filepath = load_working_file_filepath(self.project_settings, 'feature_names')
+        #else:
+        #    if model_config['feature_settings']['select_before_eng']:
+        #        feature_names_filepath = artifact_dir + '/' + slugify(model_config['model_name']) +\
+        #                                 '-selected-features-features.txt'
+        #    else:
+        #        feature_names_filepath = load_clean_input_file_filepath(self.project_settings, 'feature_names')
+        #inv_column_map = load_inv_column_map(feature_names_filepath)
+        #self.inv_column_map = inv_column_map
+        #self.original_columns = original_columns
 
     #def fit(self,X_train,y_train=None):
     #    pass
