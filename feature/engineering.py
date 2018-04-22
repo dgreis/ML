@@ -4,6 +4,7 @@ import importlib
 import itertools
 
 import pandas as pd
+import numpy.random as npr
 
 from manipulator import ManipulatorChain, Manipulator
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -42,37 +43,47 @@ class TransformChain(ManipulatorChain):
     def det_prior_feature_names_filepath(self,model_config):
         pass
 
-    def transform(self,X_mat,y_mat,dataset_name="Train"):
+    def fit(self,X_mat,y,dataset_name="Train"):
         log_prefix = "[" + dataset_name + "]"
         transformations = self.transformations
-        self._pass_y_to_self(y_mat)
         i = 1
+        for d in transformations:
+            transformer_name = d.keys()[0]
+            print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
+                len(transformations)) + "): " + transformer_name
+            transformer = d[transformer_name]['initialized_transformer']
+            transformer.fit(X_mat,y)
+            i += 1
+
+    def transform(self,X_mat,y,dataset_name="Train"):
+        transformations = self.transformations
         if len(transformations) < 1:
-            X_transform = X_mat
+            X_transform, y_transform = X_mat, y
         else:
+            i = 1
             for d in transformations:
                 transformer_name = d.keys()[0]
-                print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
-                    len(transformations)) + "): " + transformer_name
                 transformer = d[transformer_name]['initialized_transformer']
-                transformer.fit(X_mat,y_mat)
-                X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat,y_mat)
-                X_touched, y_touched = transformer.transform(X_touch,y_touch)
+                X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y, dataset_name)
+                X_touched, y_touched = transformer.transform(X_touch,y_touch,dataset_name)
                 #fit_transform_args = self._get_args(transform_class, 'fit_transform')
                 #additional_args = filter(lambda x: x not in ['X_touch','working_features'], fit_transform_args)
                 #kwargs = dict()
                 #for arg in additional_args:
                 #    kwargs[arg] = getattr(self, arg)
                 #X_touched, new_feat_names = transformer.fit_transform(X_touch, working_features,**kwargs)
-                X_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched)
+                X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched,dataset_name)
                 if dataset_name == "Train":
                     if transformer.store:
                         artifact_dir = self.artifact_dir
                         transformer.store_output(X_transform,output_dir=artifact_dir)
-                X_mat = X_transform
+                X_mat, y_mat = X_transform, y_transform
                 i += 1
-        return X_transform
+        return X_transform, y_transform
 
+    def fit_transform(self,X_mat,y,dataset_name="Train"):
+        self.fit(X_mat,y,dataset_name)
+        return self.transform(X_mat,y,dataset_name)
 
 class Transformer(Manipulator):
 
@@ -131,7 +142,7 @@ class Transformer(Manipulator):
     def set_base_transformer(self,transformer_instance):
         self.base_transformer = transformer_instance
 
-    def fit(self,X_mat,y_mat):
+    def fit(self,X_mat,y):
         pass
 
     def determine_split_indices(self, prior_features):
@@ -175,7 +186,10 @@ class Transformer(Manipulator):
         features = self.features
         assert len(features) == X_transform.shape[1]
         X_transform.columns = range(len(features))
-        return X_transform
+        if y_touched is not None:
+            print "this is mean to be a vertical transform. y_touched is not None which seems like a horizontal transform"
+            raise Exception
+        return X_transform, y_untouched
 
     def store_output(self,X_mat,output_dir): #TODO: When I need to output filter, make this an abstract method in new ManipulatorChain class
         model_name = self.model_name
@@ -343,6 +357,89 @@ class LeaveOneOutEncoder:
                 loo_vals.append(y_loo_mean)
         assert len(loo_vals) == len(X_mat)
         return pd.DataFrame(pd.Series(loo_vals))
+
+
+class sample(Transformer):
+    """Example in models.yaml file:
+        Models:
+          <Model Name>:
+           feature_settings:
+             feature_engineering:
+               - sample:
+                   inclusion_patterns:
+                     - "All"
+                   kwargs:
+                      upsample: <boolean> (def: False):
+    """
+    def __init__(self,model_config,project_settings):
+        super(sample, self).__init__(model_config, project_settings )
+        self.set_base_transformer(Sampler(**self.kwargs))
+        self.configure_ancestors_and_features()
+
+    def fit(self,X_mat,y_mat):
+        y = pd.Series(y_mat)
+        min_idx = y[y == 1].index.tolist()
+        maj_idx = y[y == 0].index.tolist()
+        upsample = getattr(self.base_transformer,'upsample_flag')
+        if upsample:
+            touch_indices = min_idx
+            untouched_indices = maj_idx
+        else:
+            touch_indices = maj_idx
+            untouched_indices = min_idx
+        self.touch_indices = touch_indices
+        self.untouched_indices = untouched_indices
+        setattr(self.base_transformer,'touch_indices', touch_indices)
+        setattr(self.base_transformer,'untouched_indices', untouched_indices)
+
+    def split(self, X_mat, y, dataset_name):
+        """This is a horizontal splitting method"""
+        if dataset_name == "Train":
+            untouched_indices = self.untouched_indices
+            touch_indices = self.touch_indices
+            X_untouched = X_mat.loc[untouched_indices,:]
+            y_untouched = pd.Series(y).loc[untouched_indices].tolist()
+            X_touch = X_mat.loc[touch_indices,:]
+            y_touch = pd.Series(y).loc[touch_indices].tolist()
+            return X_touch, X_untouched, y_touch, y_untouched
+        else:
+            return None, X_mat, None, y
+
+    def transform(self,X_touch,y_touch,dataset_name):
+        if dataset_name == "Train":
+            X_touched, y_touched =  self.base_transformer.transform(X_touch,y_touch)
+            return X_touched, y_touched
+        else:
+            return X_touch, y_touch
+
+    def combine(self,X_touched,X_untouched,y_touched,y_untouched,dataset_name):
+        "This is a vertical combine instead of the default horizontal"
+        if dataset_name == "Train":
+            X_transform = X_untouched.append(X_touched,ignore_index=True)
+            y_transform = y_touched + y_untouched
+            return X_transform, y_transform
+        else:
+            return X_untouched, y_untouched
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        return prior_features
+
+class Sampler:
+
+    def __init__(self,upsample=False):
+        self.touch_indices = None
+        self.untouched_indices = None
+        self.upsample_flag = upsample
+
+    def transform(self,X_touch,y_touch):
+        touch_indices = self.touch_indices
+        untouched_indices = self.untouched_indices
+        sample_size = len(untouched_indices)
+        sampled_idx = npr.choice(touch_indices,size=sample_size)
+        X_touched = X_touch.loc[sampled_idx,:]
+        y_touched = pd.Series(y_touch,index=touch_indices).loc[sampled_idx].tolist()
+        return X_touched, y_touched
+
 
 
 

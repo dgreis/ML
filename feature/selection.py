@@ -24,7 +24,7 @@ class FilterChain(ManipulatorChain):
         model_config = self.model_config
         model_config['feature_settings']['order'] = -1
         project_settings = self.project_settings
-        self._pass_y_to_self(y)
+        #self._pass_y_to_self(y)
         X_filt = X_mat
         i = 1
         if len(filters) < 1:
@@ -35,13 +35,13 @@ class FilterChain(ManipulatorChain):
                 print "\t[Train] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
                 filter_class = getattr(selection_module,filter_name)
                 fit_args = self._get_args(filter_class, 'fit')
-                additional_args = filter(lambda x: x not in ['X_mat'], fit_args)
+                additional_args = filter(lambda x: x not in ['X_mat','y'], fit_args)
                 model_config['feature_settings']['order'] += 1
                 filter_instance = filter_class(model_config,project_settings)
                 kwargs = dict()
                 for arg in additional_args:
                     kwargs[arg] = getattr(self,arg)
-                filter_instance.fit(X_filt, **kwargs)
+                filter_instance.fit(X_mat,y,**kwargs)
                 features = filter_instance.features
                 reindexed_features = filter_instance.reindex(features)
                 filter_instance.features = reindexed_features
@@ -49,9 +49,9 @@ class FilterChain(ManipulatorChain):
                 d[filter_name]['initialized_filter'] = filter_instance
                 i += 1
 
-    def transform(self, X_mat,original_columns=False,dataset_name=None):
+    def transform(self, X_mat,y,dataset_name=None):
         filters = self.filters
-        X_filt, y_filt = X_mat, self.y
+        X_filt, y_filt = X_mat, y
         if dataset_name is not None:
             log_prefix = dataset_name
         else:
@@ -62,10 +62,9 @@ class FilterChain(ManipulatorChain):
             for i in range(num_filters):
                 filter_name = filters[i].keys()[0]
                 filter_instance = filters[i][filter_name]['initialized_filter']
-                _, X_filt, _, y_filt = filter_instance.split(X_filt, self.y)
+                _, X_filt, _, y_filt = filter_instance.split(X_filt, y, )
                 X_filt.columns = filter_instance.features.keys()
-                assert 1 == 1
-        return X_filt
+        return X_filt, y_filt
 
     def det_prior_feature_names_filepath(self,model_config):
         pass
@@ -125,7 +124,7 @@ class exclude_features(Filter):
         super(exclude_features, self).__init__(model_config, project_settings)
         self.patterns = self.fetch_filter_settings('exclude_features')
 
-    def fit(self,X_mat):
+    def fit(self,**kwargs):
         prior_manipulator_feature_names_filepath = self.prior_manipulator_feature_names_filepath
         inv_column_map = load_inv_column_map(prior_manipulator_feature_names_filepath)
         prior_features = flip_dict(inv_column_map)

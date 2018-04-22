@@ -2,22 +2,31 @@ Models:
 
   Logistic Regression:
     base_algorithm: sklearn.linear_model.LogisticRegression
+
+  Logistic Regression Downsampled:
+    base_algorithm: sklearn.linear_model.LogisticRegression
     feature_settings:
       feature_engineering:
-        - normalize:
+        - sample:
+            kwargs:
+              upsample: False
             inclusion_patterns:
-              - "age"
-        - interaction_terms:
-            interactions:
-              - "( 'norm(age)', 'job')"
-      select_before_eng: "True"
+              - "All"
       feature_selection:
-        - exclude_features:
-            patterns:
-              - "poutcome"
         - tree_based:
             keyword_arg_settings: {}
             other_options: {}
+
+  Logistic Regression Upsampled:
+    base_algorithm: sklearn.linear_model.LogisticRegression
+    feature_settings:
+      feature_engineering:
+        - sample:
+            kwargs:
+              upsample: True
+            inclusion_patterns:
+              - "All"
+
 
   #Logistic Regression:
   #  base_algorithm: sklearn.linear_model.LogisticRegression
