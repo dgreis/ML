@@ -43,19 +43,19 @@ class TransformChain(ManipulatorChain):
     def det_prior_feature_names_filepath(self,model_config):
         pass
 
-    def fit(self,X_mat,y,dataset_name="Train"):
+    def fit(self,X_mat,y,dataset_name):
         log_prefix = "[" + dataset_name + "]"
         transformations = self.transformations
         i = 1
         for d in transformations:
             transformer_name = d.keys()[0]
-            print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
-                len(transformations)) + "): " + transformer_name
+            #print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
+            #    len(transformations)) + "): " + transformer_name
             transformer = d[transformer_name]['initialized_transformer']
             transformer.fit(X_mat,y)
             i += 1
 
-    def transform(self,X_mat,y,dataset_name="Train"):
+    def transform(self,X_mat,y,dataset_name):
         transformations = self.transformations
         if len(transformations) < 1:
             X_transform, y_transform = X_mat, y
@@ -73,7 +73,8 @@ class TransformChain(ManipulatorChain):
                 #    kwargs[arg] = getattr(self, arg)
                 #X_touched, new_feat_names = transformer.fit_transform(X_touch, working_features,**kwargs)
                 X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched,dataset_name)
-                if dataset_name == "Train":
+                assert True not in pd.isnull(X_transform).any(1).value_counts() #TODO: pandas dependent
+                if dataset_name == "train":
                     if transformer.store:
                         artifact_dir = self.artifact_dir
                         transformer.store_output(X_transform,output_dir=artifact_dir)
@@ -81,7 +82,7 @@ class TransformChain(ManipulatorChain):
                 i += 1
         return X_transform, y_transform
 
-    def fit_transform(self,X_mat,y,dataset_name="Train"):
+    def fit_transform(self,X_mat,y,dataset_name):
         self.fit(X_mat,y,dataset_name)
         return self.transform(X_mat,y,dataset_name)
 
