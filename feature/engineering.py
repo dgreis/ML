@@ -27,14 +27,15 @@ class TransformChain(ManipulatorChain):
             transform_class = getattr(engineering_module, transformer_name)
             if transform_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
                 transform_chain_class = transform_class
-                tc = transform_chain_class(starting_transformations,model_config,project_settings,original_columns)
+                transform_chain_offset = [st.keys()[0] for st in starting_transformations].index(transformer_name) +1
+                tc = transform_chain_class(starting_transformations[:transform_chain_offset],model_config,project_settings,original_columns)
                 updated_transformations = tc.transformations
             else:
                 transformer_name = transformation.keys()[0]
                 transformer_class_name = transformer_name.split('.')[-1:][0]
                 transform_class = getattr(engineering_module, transformer_class_name)
-                model_config['feature_settings']['order'] += 1
                 transformer = transform_class(model_config, project_settings)
+                model_config['feature_settings']['order'] += 1
                 transformation[transformer_name]['initialized_transformer'] = transformer
                 updated_transformations = updated_transformations + [transformation]
         super(TransformChain,self).__init__(updated_transformations, model_config, project_settings,original_columns)
@@ -172,7 +173,7 @@ class Transformer(Manipulator):
     def transform(self, X_touch, y_touch, **kwargs):
         X_touched = self.base_transformer.fit_transform(X_touch,**kwargs)
         if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
-            rdf = pd.DataFrame(X_touched)
+            rdf = pd.DataFrame(X_touched,index=X_touch.index)
         else:
             rdf = X_touched
         return rdf, y_touch
@@ -262,8 +263,14 @@ class interaction_terms(TransformChain):
                 }
                 expanded_transformations.append(transformation_dict)
                 i += 1
-        transformations.pop()
-        transformations = transformations + expanded_transformations
+        transformation_names = [t.keys()[0] for t in transformations]
+        int_idx = transformation_names.index('interaction_terms')
+        if int_idx == 0:
+            transformations = expanded_transformations + transformations[1:]
+        elif int_idx < len(transformations) - 1:
+            transformations = transformations[0:int_idx] + expanded_transformations +transformations[int_idx+1:]
+        else:
+            transformations = transformations[:-1] + expanded_transformations
         model_config['feature_settings']['feature_engineering'] = transformations
         super(interaction_terms, self).__init__(transformations, model_config, project_settings,original_columns)
 
