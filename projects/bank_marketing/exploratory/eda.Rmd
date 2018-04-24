@@ -4,6 +4,9 @@ output: html_notebook
 ---
 
 ```{r}
+
+require(glmnet)
+
 bank_input = "~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank/bank-full.csv"
 addl_input = "~/Documents/Personal/Data_Projects/ML/projects/bank_marketing/data/bank-additional/bank-additional-full.csv"
 df = read.csv(bank_input,sep=";")
@@ -61,7 +64,8 @@ for (col in c("job_","month_","marital_","poutcome_","default_",
 ```
 
 ```{R}
-m = cv.glmnet(as.matrix(X_train),as.factor(y_train[,1]),family='binomial',type.measure = 'class')
+#m = cv.glmnet(as.matrix(X_train),as.factor(y_train[,1]),family='binomial',type.measure = 'class')
+m = glm(outcome ~ . + poutcome*month, data =df, family='binomial')
 summary(m)
 ```
 
@@ -126,4 +130,14 @@ seg = rep(1:5,6)
 df = data.frame(x=x,y=y,seg=seg)
 
 probabilize_high_card_cat(df,y,x)
+```
+
+
+Outcome vs. quant vars
+```{r}
+with(df,plot(outcome ~ balance))
+```
+
+```{r}
+with(df,plot(outcome ~ day``))
 ```

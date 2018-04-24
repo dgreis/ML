@@ -22,10 +22,10 @@ metrics:
         battery:
           f1_score:
             metric_type: column
-            kwargs: { "average" : "binary" }
+            kwargs: { "average" : "macro" }
           recall_score:
             metric_type: column
-            kwargs: { "average" : "binary" }
+            kwargs: { "average" : "macro" }
           precision_score:
             metric_type: column
-            kwargs: { "average" : "binary" }
+            kwargs: { "average" : "macro" }

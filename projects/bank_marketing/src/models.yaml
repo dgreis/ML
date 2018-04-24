@@ -1,10 +1,10 @@
 Models:
 
-  Logistic Regression:
-    base_algorithm: sklearn.linear_model.LogisticRegression
+  GBM:
+    base_algorithm: sklearn.ensemble.GradientBoostingClassifier
 
-  Logistic Regression Downsampled:
-    base_algorithm: sklearn.linear_model.LogisticRegression
+  GBM Downsampled:
+    base_algorithm: sklearn.ensemble.GradientBoostingClassifier
     feature_settings:
       feature_engineering:
         - sample:
@@ -12,13 +12,9 @@ Models:
               upsample: False
             inclusion_patterns:
               - "All"
-      feature_selection:
-        - tree_based:
-            keyword_arg_settings: {}
-            other_options: {}
 
-  Logistic Regression Upsampled:
-    base_algorithm: sklearn.linear_model.LogisticRegression
+  GBM Upsampled:
+    base_algorithm: sklearn.ensemble.GradientBoostingClassifier
     feature_settings:
       feature_engineering:
         - sample:
