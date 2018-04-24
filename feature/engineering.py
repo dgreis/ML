@@ -65,15 +65,15 @@ class TransformChain(ManipulatorChain):
             for d in transformations:
                 transformer_name = d.keys()[0]
                 transformer = d[transformer_name]['initialized_transformer']
-                X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y, dataset_name)
-                X_touched, y_touched = transformer.transform(X_touch,y_touch,dataset_name)
+                X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y)
+                X_touched, y_touched = transformer.transform(X_touch,y_touch)
                 #fit_transform_args = self._get_args(transform_class, 'fit_transform')
                 #additional_args = filter(lambda x: x not in ['X_touch','working_features'], fit_transform_args)
                 #kwargs = dict()
                 #for arg in additional_args:
                 #    kwargs[arg] = getattr(self, arg)
                 #X_touched, new_feat_names = transformer.fit_transform(X_touch, working_features,**kwargs)
-                X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched,dataset_name)
+                X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched)
                 assert True not in pd.isnull(X_transform).any(1).value_counts() #TODO: pandas dependent
                 if dataset_name == "train":
                     if transformer.store:
@@ -201,7 +201,21 @@ class Transformer(Manipulator):
 
 
 class basis_expansion(Transformer):
+    """
+    yaml usage example:
 
+    Models:
+      <Model Name>:
+        base_algorithm: <algorithm>
+          feature_settings:
+            feature_engineering:
+              - basis_expansion:
+                 inclusion_patterns:
+                  - <feature_name>
+                 kwargs:
+                    include_bias: <bool>
+                    interaction_only: <bool>
+    """
     def __init__(self, model_config, project_settings):
         super(basis_expansion, self).__init__(model_config, project_settings)
         self.set_base_transformer(PolynomialFeatures(**self.kwargs))
@@ -226,14 +240,25 @@ class basis_expansion(Transformer):
 
     def stich(self,tuple):
         if tuple[0] == tuple[1]:
-            return tuple[0] + '**2'
+            return "(" + tuple[0] + ')**2'
         else:
-            return tuple[0] + 'x%x' + tuple[1]
+            return 'inter(' + tuple[0] + 'x%x' + tuple[1] + ')'
 
 class interaction_terms(TransformChain):
+    """
+    Models:
+      <model name>
+        base_algorithm: <algorithm>
+          feature_settings:
+            feature_engineering:
+              - interaction_terms:
+                  interactions: (examples below)
+                    - "('bill_sep','hist_sep')"
+                    - "('bill_sep','prepay_sep')"
+    """
 
     def __init__(self,transformations, model_config, project_settings,original_columns):
-        Manipulator.__init__(self,model_config,project_settings,transformations)
+        Manipulator.__init__(self,model_config,project_settings,transformations) #TODO: figure out this troublesome line
         raw_interaction_strs = filter(lambda x: x.keys()[0] == 'interaction_terms',  transformations)[0]['interaction_terms']['interactions']
         compact_interactions = [eval(ris) for ris in raw_interaction_strs]
         expanded_transformations = list()
@@ -354,10 +379,7 @@ class LeaveOneOutEncoder:
         loo_vals = list()
         for j in X_mat.columns:
             j_idx = X_mat[X_mat.loc[:,j] > 0].index
-            try:
-                yj = [y[ji] for ji in j_idx]
-            except IndexError:
-                pass
+            yj = [y[ji] for ji in j_idx]
             cat_sum = sum(yj)
             cat_len = len(yj)
             for i in j_idx:
