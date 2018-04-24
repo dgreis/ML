@@ -1,0 +1,40 @@
+Models:
+
+  Logistic Regression:
+    base_algorithm: sklearn.linear_model.LogisticRegression
+
+  Logistic with Interactions & Basis:
+    base_algorithm: sklearn.linear_model.LogisticRegression
+    feature_settings:
+      feature_engineering:
+        - interaction_terms:
+            interactions:
+              - "('bill_sep','hist_sep')"
+              - "('bill_sep','prepay_sep')"
+        - intx.basis_expansion:
+            inclusion_patterns:
+              - "hist_sep"
+            kwargs:
+              include_bias: False
+              interaction_only: False
+
+  Logistic Just Basis:
+    base_algorithm: sklearn.linear_model.LogisticRegression
+    feature_settings:
+      feature_engineering:
+        - intx.basis_expansion:
+            inclusion_patterns:
+              - "hist_sep"
+            kwargs:
+              include_bias: False
+              interaction_only: False
+
+
+  Logistic with Interactions:
+    base_algorithm: sklearn.linear_model.LogisticRegression
+    feature_settings:
+      feature_engineering:
+        - interaction_terms:
+            interactions:
+              - "('bill_sep','hist_sep')"
+              - "('bill_sep','prepay_sep')"

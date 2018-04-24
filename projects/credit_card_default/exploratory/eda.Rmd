@@ -1,0 +1,25 @@
+---
+title: "Exploratory Data Analysis - Taiwan Credit Default"
+output: html_notebook
+---
+
+```{r}
+
+X_train = read.csv("~/Documents/Personal/Data_Projects/ML/projects/credit_card_default/data/processed/X_train.txt",sep="\t",header=FALSE)
+y_train = read.csv("~/Documents/Personal/Data_Projects/ML/projects/credit_card_default/data/processed/X_train.txt",sep="\t",header=FALSE)
+feature_names = read.csv("~/Documents/Personal/Data_Projects/ML/projects/credit_card_default/data/processed/features.txt",sep='\t',header=FALSE)
+
+df = X_train
+names(df) = as.character(feature_names[,1])
+df[,'outcome'] = y_train[,1]
+
+for (col in c("gender_","education_","marital_status_")){
+  d = df[,grep(col,names(df))]
+  df = df[,!(names(df) %in% grep(col,names(df),value=T))]
+  w = which(d==1,arr.ind = T)
+  col_name = strsplit(col,'_')[[1]]
+  df[,col_name] <-(names(d)[w[order(w[,1]),2]])
+  df[,col_name] <- sapply(strsplit(df[,col_name],"_"), `[`, 2)
+}
+
+```

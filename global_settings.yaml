@@ -1,5 +1,5 @@
 repo_loc: "/Users/davidgreis/Documents/Personal/Data_Projects/ML"
-current_project: "bank_marketing"
+current_project: "credit_card_default"
 
 model_facet_defaults:
     keyword_arg_settings : {}
@@ -34,6 +34,9 @@ metrics:
           classification_report:
             metric_type: classification_report
             kwargs: {}
+          roc_auc_score:
+            metric_type: column
+            kwargs: { "average" : 'None' }
           f1_score:
             metric_type: column
             kwargs: { "average" : "weighted" }
