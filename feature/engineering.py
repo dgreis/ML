@@ -378,7 +378,8 @@ class sample(Transformer):
         self.configure_ancestors_and_features()
 
     def fit(self,X_mat,y_mat):
-        y = pd.Series(y_mat)
+        X_mat_idx = X_mat.index.tolist()
+        y = pd.Series(y_mat,index=X_mat_idx)
         min_idx = y[y == 1].index.tolist()
         maj_idx = y[y == 0].index.tolist()
         upsample = getattr(self.base_transformer,'upsample_flag')
@@ -395,19 +396,20 @@ class sample(Transformer):
 
     def split(self, X_mat, y, dataset_name):
         """This is a horizontal splitting method"""
-        if dataset_name == "Train":
+        if dataset_name == "train":
+            X_mat_idx = X_mat.index.tolist()
             untouched_indices = self.untouched_indices
             touch_indices = self.touch_indices
             X_untouched = X_mat.loc[untouched_indices,:]
-            y_untouched = pd.Series(y).loc[untouched_indices].tolist()
+            y_untouched = pd.Series(y,index=X_mat_idx).loc[untouched_indices].tolist()
             X_touch = X_mat.loc[touch_indices,:]
-            y_touch = pd.Series(y).loc[touch_indices].tolist()
+            y_touch = pd.Series(y,index=X_mat_idx).loc[touch_indices].tolist()
             return X_touch, X_untouched, y_touch, y_untouched
         else:
             return None, X_mat, None, y
 
     def transform(self,X_touch,y_touch,dataset_name):
-        if dataset_name == "Train":
+        if dataset_name == "train":
             X_touched, y_touched =  self.base_transformer.transform(X_touch,y_touch)
             return X_touched, y_touched
         else:
@@ -415,7 +417,7 @@ class sample(Transformer):
 
     def combine(self,X_touched,X_untouched,y_touched,y_untouched,dataset_name):
         "This is a vertical combine instead of the default horizontal"
-        if dataset_name == "Train":
+        if dataset_name == "train":
             X_transform = X_untouched.append(X_touched,ignore_index=True)
             y_transform = y_touched + y_untouched
             return X_transform, y_transform
@@ -437,8 +439,11 @@ class Sampler:
         untouched_indices = self.untouched_indices
         sample_size = len(untouched_indices)
         sampled_idx = npr.choice(touch_indices,size=sample_size)
-        X_touched = X_touch.loc[sampled_idx,:]
-        y_touched = pd.Series(y_touch,index=touch_indices).loc[sampled_idx].tolist()
+        X_touch_dict = X_touch.to_dict(orient='index')
+        new_x_rows = [X_touch_dict[ri] for ri in sampled_idx]
+        X_touched = pd.DataFrame(new_x_rows,index=sampled_idx)
+        y_touch_dict = dict(pd.Series(y_touch,index=touch_indices))
+        y_touched = [y_touch_dict[ri] for ri in sampled_idx]
         return X_touched, y_touched
 
 
