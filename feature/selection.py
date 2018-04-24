@@ -17,22 +17,21 @@ class FilterChain(ManipulatorChain):
         ManipulatorChain.__init__(self, filters, model_config, project_settings, original_columns)
         self.filters = filters
 
-    def fit(self,X_mat,y):
+    def fit_transform(self,X_mat,y,dataset_name):
         """To be fit method of filter_chain class"""
         selection_module = importlib.import_module('feature.selection')
         filters = self.filters
         model_config = self.model_config
         model_config['feature_settings']['order'] = -1
         project_settings = self.project_settings
-        #self._pass_y_to_self(y)
-        X_filt = X_mat
+        X_filt, y_filt = X_mat, y
         i = 1
         if len(filters) < 1:
             pass
         else:
             for d in filters:
                 filter_name = d.keys()[0]
-                print "\t[Train] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
+                #print "\t[" + dataset_name + "] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
                 filter_class = getattr(selection_module,filter_name)
                 fit_args = self._get_args(filter_class, 'fit')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], fit_args)
@@ -41,30 +40,43 @@ class FilterChain(ManipulatorChain):
                 kwargs = dict()
                 for arg in additional_args:
                     kwargs[arg] = getattr(self,arg)
-                filter_instance.fit(X_mat,y,**kwargs)
+                filter_instance.fit(X_filt,y_filt,**kwargs)
                 features = filter_instance.features
                 reindexed_features = filter_instance.reindex(features)
                 filter_instance.features = reindexed_features
                 filter_instance.output_features()
                 d[filter_name]['initialized_filter'] = filter_instance
-                i += 1
-
-    def transform(self, X_mat,y,dataset_name=None):
-        filters = self.filters
-        X_filt, y_filt = X_mat, y
-        if dataset_name is not None:
-            log_prefix = dataset_name
-        else:
-            log_prefix = "Non-training"
-        num_filters = len(filters)
-        if num_filters > 0:
-            print "\t["+log_prefix+"] Filtering selected features"
-            for i in range(num_filters):
-                filter_name = filters[i].keys()[0]
-                filter_instance = filters[i][filter_name]['initialized_filter']
-                _, X_filt, _, y_filt = filter_instance.split(X_filt, y, )
+                _, X_filt, _, y_filt = filter_instance.split(X_filt, y)
+                assert True not in pd.isnull(X_filt).any(1).value_counts() #TODO: pandas dependent
                 X_filt.columns = filter_instance.features.keys()
+                i += 1
         return X_filt, y_filt
+
+    def transform(self, X_mat,y,dataset_name):
+        #TODO: select according to final filter
+        filters = self.filters
+        log_prefix = dataset_name
+        num_filters = len(filters)
+        X_filt = X_mat
+        if num_filters > 0:
+            #print "\t["+log_prefix+"] Filtering selected features"
+            first_filter = self._fetch_initialized_filter(filters[0])
+            final_filter = self._fetch_initialized_filter(filters[-1:][0])
+            prior_features_filepath = first_filter.prior_manipulator_feature_names_filepath
+            orig_inv_column_map = load_inv_column_map(prior_features_filepath)
+            final_filter_features = final_filter.features
+            inv_column_map = flip_dict(final_filter_features)
+            filtered_indices = list()
+            for col in inv_column_map:
+                filtered_indices.append(orig_inv_column_map[col])
+            X_filt = X_mat.loc[:,filtered_indices]
+        assert True not in pd.isnull(X_filt).any(1).value_counts()  # TODO: pandas dependent
+        return X_filt, y
+
+    def _fetch_initialized_filter(self,entry):
+        assert len(entry.keys()) == 1
+        key = entry.keys()[0]
+        return entry[key]['initialized_filter']
 
     def det_prior_feature_names_filepath(self,model_config):
         pass
