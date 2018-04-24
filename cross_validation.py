@@ -103,12 +103,26 @@ class CrossValidator:
             cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] == 'column'}
             for metric_name in cv_battery:
                 metric_class = evaluation_battery[metric_name]['class']
-                kwargs = evaluation_battery[metric_name]['kwargs']
+                kwargs = self._handle_kwargs(evaluation_battery[metric_name]['kwargs'])
                 if not report_entries.has_key(metric_name):
                     report_entries[metric_name] = {model_name : []}
-                report_entries[metric_name][model_name].append(metric_class(y_pred, y_val_p, **kwargs))
+                try:
+                    report_entries[metric_name][model_name].append(metric_class(y_pred, y_val_p, **kwargs))
+                except ValueError:
+                    report_entries[metric_name][model_name].append(np.nan)
             f += 1
         return report_entries
+
+    def _handle_kwargs(self,kwargs):
+        newdict = dict()
+        for k,v in kwargs.items():
+            if v in ["None","True","False"]:
+                newdict[k] = eval(v)
+            else:
+                newdict[k] = v
+        return newdict
+
+
 
     def average_entries(self,entries):
         averaged_dict = dict()
