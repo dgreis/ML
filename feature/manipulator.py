@@ -92,19 +92,7 @@ class ManipulatorChain(Manipulator):
 
     def transform(self,X_mat,y):
         raise NotImplementedError
-
-    def _set_working_features(self, col_map):
-        self.working_features = col_map
-
-    def _update_working_data_feature_names_ref(self, feature_version):
-        model_config = self.model_config
-        model_name = model_config['model_name']
-        model_file_name_prefix = slugify(model_name)
-        artifact_dir = self.artifact_dir
-        project_settings = self.project_settings
-        project_settings['working_files']['feature_names'] = artifact_dir + '/' + model_file_name_prefix + \
-                                                             '-' + (feature_version.replace('_','-')) + '-features.txt'
-
+    
     def _get_args(self, class_, method):
         target = getattr(class_,method)
         args = getattr(inspect.getargspec(target),'args')
