@@ -173,7 +173,17 @@ class inclusion_patterns(Filter):
         return X_mat_filt
 
 class l1_based(Filter):
-
+    """
+    Sample yaml usage:
+    <model name>:
+        base_algorithm: <algorithm>
+        feature_settings:
+          feature_selection:
+           - l1_based:
+               method: "LinearSVC"
+               kwargs:
+                 dual: False
+    """
     def __init__(self,model_config,project_settings):
         Filter.__init__(self,model_config,project_settings)
         self.l1_settings = self.fetch_filter_settings('l1_based')
