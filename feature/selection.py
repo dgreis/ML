@@ -9,6 +9,8 @@ from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import SelectFromModel
 from sklearn.feature_selection import RFECV
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_classif
 
 class FilterChain(ManipulatorChain):
 
@@ -172,11 +174,11 @@ class inclusion_patterns(Filter):
 
 class l1_based(Filter):
 
-    def __init__(self,model_config):
-        Filter.__init__(self,model_config)
+    def __init__(self,model_config,project_settings):
+        Filter.__init__(self,model_config,project_settings)
         self.l1_settings = self.fetch_filter_settings('l1_based')
 
-    def apply(self,X_mat,y_train):
+    def fit(self, X_mat, y):
         l1_settings = self.l1_settings
         method = l1_settings['method']
         kwargs = l1_settings['kwargs']
@@ -187,11 +189,11 @@ class l1_based(Filter):
             l1_model = LogisticRegression(**kwargs)
         else:
             raise NotImplementedError
-        l1_model.fit(X_mat,y_train)
+        l1_model.fit(X_mat, y)
         s = pd.Series(l1_model.coef_.sum(0))
-        nonzero_features = s[abs(s) > 0.0001].index.tolist()
-        X_filt = X_mat.iloc[:,nonzero_features]
-        return X_filt
+        untouched_indices = s[abs(s) > 0.0001].index.tolist()
+        touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
+        self._store_indices_and_features(untouched_indices,touch_indices)
 
 class tree_based(Filter):
     """
@@ -223,8 +225,38 @@ class tree_based(Filter):
         else:
             selection_threshold = None
         model = SelectFromModel(clf, prefit=True, threshold=selection_threshold)
-        X_filt = pd.DataFrame(model.transform(X_mat))
-        untouched_indices = X_filt.columns.tolist()
+        #model.fit(X_mat)
+        ir = pd.Series(model.get_support())
+        untouched_indices = ir[ir == True].index
+        touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
+        self._store_indices_and_features(untouched_indices,touch_indices)
+
+class f_based(Filter):
+    """
+     Example yaml usage:
+
+     Models:
+       <Model Name>
+         feature_settings:
+           feature_selection:
+            - f_based:
+               keyword_arg_settings: {}
+               other_options:
+                    k: <int>
+     """
+
+    def __init__(self,model_config,project_settings):
+        super(f_based,self).__init__(model_config,project_settings)
+        self.f_based_settings = self.fetch_filter_settings('f_based')
+
+    def fit(self,X_mat,y):
+        f_based_settings = self.f_based_settings
+        other_options = f_based_settings['other_options']
+        k = other_options['k']
+
+        selector = SelectKBest(f_classif, k=k).fit(X_mat, y)
+        ir = pd.Series(selector.get_support())
+        untouched_indices = ir[ir == True].index
         touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
         self._store_indices_and_features(untouched_indices,touch_indices)
 
