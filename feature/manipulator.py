@@ -23,7 +23,7 @@ class Manipulator(object):
         if len(manipulations) > 0:
             manipulator_names = [d.keys()[0] for d in manipulations]
             order = model_config['feature_settings']['order']
-            if order < 0:
+            if order <= 0:
                 prior_manipulator_feature_names_filepath = self.det_prior_feature_names_filepath(model_config)
             else:
                 prior_transform = manipulator_names[order-1]
