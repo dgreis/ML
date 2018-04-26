@@ -47,17 +47,20 @@ class CrossValidator:
                     eval_metric: <metric>
         """
         grid = self.grid
+        num_settings = len(grid)
         num_folds = self.cv_num_folds
         report_entries = pd.DataFrame({'dataset_name':[],'model_name':[],'setting': [], 'metric': [],'content': []})
+        i = 1
         for setting in grid:
             if grid != ['default']:
                 for param in setting:
                     setattr(model,param,setting[param])
             setting_name = str(setting)
-            print("\ttuning hyperparam for setting " + setting_name)
+            print("\ttuning hyperparam for setting: " + setting_name + " (" + str(i) +'/' + str(num_settings) + ")")
             setting_folds_entries = self.do_folds(data, model, num_folds, setting_name)
             setting_entries = self.aggregate_folds(setting_folds_entries)
             report_entries = report_entries.append(setting_entries,ignore_index=True)
+            i += 1
         report_entries = self.filter_by_optimal_setting(report_entries)
         return report_entries
 
@@ -75,14 +78,15 @@ class CrossValidator:
             return report_entries
         else:
             hyperparam_eval_metric = self.hyperparam_eval_metric
-            score_df = report_entries[report_entries['metric'] == hyperparam_eval_metric]
-            means = score_df['content'].apply(lambda x: x[0])
-            stds = score_df['content'].apply(lambda x: x[1])
+            score_df = report_entries[report_entries.loc[:,'metric'] == hyperparam_eval_metric].copy()
+            means = score_df.loc[:,'content'].apply(lambda x: x[0])
+            stds = score_df.loc[:,'content'].apply(lambda x: x[1])
             print("\t********* CV Results *********")
             for mean, std, params in zip(means, stds, score_df['setting']):
                 print("\t%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
-            score_df['sort_value'] = score_df['content'].apply(lambda x: x[0])
-            score_df = score_df.sort_values('sort_value', ascending=False).reset_index(drop=True)
+            score_df.loc[:,'sort_value'] = score_df.loc[:,'content'].apply(lambda x: x[0])
+            score_df.sort_values('sort_value', ascending=False,inplace=True)
+            score_df.reset_index(drop=True,inplace=True)
             print("\tBest hyperparam setting: " + score_df.loc[0, 'setting'] + " @ " + str(score_df.loc[0, 'sort_value']))
             self.optimal_hyperparams = eval(score_df.loc[0, 'setting'])
             winning_setting = score_df.loc[0, 'setting']
@@ -141,18 +145,6 @@ class CrossValidator:
             else:
                 newdict[k] = v
         return newdict
-
-
-
-    def average_entries(self,entries):
-        averaged_dict = dict()
-        metric_keys = entries.keys()
-        for key in metric_keys:
-            inner_dict = entries[key]
-            model_name = inner_dict.keys()[0]
-            series = inner_dict[model_name]
-            averaged_dict[key] = { model_name : np.mean(series) }
-        return averaged_dict
 
 
 
