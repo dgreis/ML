@@ -9,21 +9,20 @@ class Report:
 
     def __init__(self,project_settings):
         self.project_settings = project_settings
-        self.entries = dict()
+        self.report_entries = pd.DataFrame()
 
-    def add_entry(self,metric_name,model_name,content):
-        entries = self.entries
-        if entries.has_key(metric_name):
-            entries[metric_name][model_name] = content
+    def add_entries_to_report(self,entries):
+        entry_columns = ['dataset_name','model_name','setting', 'metric','content']
+        if type(entries) == pd.DataFrame:
+            entries = [entries.iloc[i].to_dict() for i in range(len(entries))]
+            for entry in entries:
+                assert set(entry_columns) == set(entry.keys())
         else:
-            entries[metric_name] = dict()
-            entries[metric_name][model_name] = content
-        self.entries = entries
-
-    def add_multiple_entries(self,new_entries):
-        entries = self.entries
-        updated_entries = update(entries,new_entries)
-        self.entries = updated_entries
+            assert set(entry_columns) == set(entries.keys())
+        report_entries = self.report_entries
+        new_report_entries = report_entries.append(entries,ignore_index=True)
+        assert len(new_report_entries) > len(report_entries)
+        self.report_entries = new_report_entries
 
     def write_report(self):
         project_settings = self.project_settings
@@ -33,31 +32,39 @@ class Report:
             os.makedirs(eval_dir)
         with open(eval_dir + '/report.html',"w") as f:
             eval_battery = load_evaluation_battery(project_settings)
-            entries = self.entries
-            column_entries = {k: v for k, v in entries.iteritems() if eval_battery[k]['metric_type'] == 'column'}
-            column_table = pd.DataFrame(column_entries)
-            column_table_html = column_table.T.to_html()
+            mtlu = dict([(b, eval_battery[b]['metric_type']) for b in eval_battery.keys()])
+            report_entries = self.report_entries
+            report_entries['metric_type'] = report_entries['metric'].apply(lambda x: mtlu[x])
+            column_entries = report_entries[(report_entries['dataset_name'] == 'cross_validation') &
+                                            (report_entries['metric_type'] == 'column')]
+            column_table = column_entries[['metric','model_name','content']].pivot('metric','model_name','content')
+            column_table = column_table.rename_axis(None)
+            for col in column_table.columns:
+                column_table[col] = column_table[col].apply(lambda x: "%0.3f (+/-%0.03f)" % (x[0], x[1] * 2))
+            column_table_html = column_table.to_html()
             f.write('<h1>Overall</h1>')
             f.write(column_table_html)
-            array_entries = {k: v for k, v in entries.iteritems() if eval_battery[k]['metric_type'] == 'array'}
-            for entry in array_entries:
-                f.write("<h1>" + entry + "</h1>")
-                models = array_entries[entry]
-                for name in models:
-                    f.write("<h3>" + name + "</h3>")
-                    array = models[name]
+            array_entries = report_entries[(report_entries['dataset_name'] == 'validation') &
+                                            (report_entries['metric_type'] == 'array')].reset_index(drop=True)
+            array_metric_names = array_entries['metric'].unique().tolist()
+            for array_metric_name in array_metric_names:
+                f.write("<h1>" + array_metric_name + "</h1>")
+                model_rows = array_entries[array_entries['metric'] == array_metric_name].reset_index()
+                for i in range(len(model_rows)):
+                    row = dict(model_rows.iloc[i])
+                    f.write("<h3>" + row['model_name'] + "</h3>")
+                    array = row['content']
                     array_table = pd.DataFrame(array)
                     array_table_html = array_table.to_html()
                     f.write(array_table_html)
-            cr_entries = {k: v for k, v in entries.iteritems() if eval_battery[k]['metric_type'] == 'classification_report'}
-            for entry in cr_entries:
-                f.write("<h1>" + entry + "</h1>")
-                models = cr_entries[entry]
-                for name in models:
-                    f.write("<h3>" + name + "</h3>")
-                    element_table = self.create_cr_table(models[name])
-                    element_html = element_table.to_html()
-                    f.write(element_html)
+            cr_entries = report_entries[(report_entries['dataset_name'] == 'validation') & (report_entries['metric_type'] == 'classification_report')].reset_index(drop=True)
+            f.write("<h1>" + 'classification_report' + "</h1>")
+            for i in range(len(cr_entries)):
+                row = dict(cr_entries.iloc[i])
+                f.write("<h3>" + row['model_name'] + "</h3>")
+                element_table = self.create_cr_table(row['content'])
+                element_html = element_table.to_html()
+                f.write(element_html)
 
     def create_cr_table(self,blob):
         # Parse rows

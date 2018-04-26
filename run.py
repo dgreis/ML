@@ -30,15 +30,10 @@ def main():
         data = manager.load_clean_datasets('train_val',project_settings)
         model = models[model_name]
         cv = CrossValidator(model_config, project_settings)
-        if cv.tune_hyperparams:
-            print "\tTuning hyper-params via cross-validation..."
-            cv.tune_hyperparams_via_cv(data, model)
-            model = cv.set_optimal_hyperparams(model)
         print "Next Step: estimate generalization error for some metrics using CV"
-        num_folds = project_settings['assessment']['cv_num_folds']
-        entries = cv.perform_cross_validation(data, model, num_folds, model_name)
-        averaged_entries = cv.average_entries(entries)
-        report.add_multiple_entries(averaged_entries)
+        entries = cv.perform_cross_validation(data, model)
+        #averaged_entries = cv.average_entries(entries)
+        report.add_entries_to_report(entries)
         print "Next Step: estimate remaining metrics using validation set."
         X_train, y_train = manager.load_clean_datasets('train',project_settings)['train']
         X_train_p, y_train_p = manager.fit_transform(X_train,y_train,'train')
@@ -51,15 +46,44 @@ def main():
         y_pred = model.predict(X_val_p)
         evaluation_battery = load_evaluation_battery(project_settings)
         non_cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] != 'column'}
+        report_row = dict()
         for metric_name in non_cv_battery:
+            report_row['dataset_name'] = 'validation'
+            report_row['model_name'] = model_config['model_name']
+            if hasattr(cv,'optimal_hyperparams'):
+                report_row['setting'] = str(cv.optimal_hyperparams)
+            else:
+                report_row['setting'] = 'default'
+            report_row['metric'] = metric_name
             metric_class = non_cv_battery[metric_name]['class']
             kwargs = non_cv_battery[metric_name]['kwargs']
-            report.add_entry(metric_name, model_name, metric_class(y_pred, y_val,**kwargs))
+            try:
+                content = metric_class(y_pred, y_val,**kwargs)
+            except ValueError:
+                content = np.nan
+            report_row['content'] = content
+            report.add_entries_to_report(report_row)
         if model_config['evaluate_testset']:
             #TODO: implement this
-            X_test,y_test = manager.load_clean_datasets('test',project_settings)
-            y_pred = model.predict(X_test)
-            raise NotImplementedError
+            X_test,y_test = manager.load_clean_datasets('test',project_settings)['test']
+            X_test_p,y_test_p = manager.transform(X_test,y_test,'test')
+            y_pred = model.predict(X_test_p)
+            for metric_name in non_cv_battery:
+                report_row['dataset_name'] = 'test'
+                report_row['model_name'] = model_config['model_name']
+                if hasattr(cv, 'optimal_hyperparams'):
+                    report_row['setting'] = str(cv.optimal_hyperparams)
+                else:
+                    report_row['setting'] = 'default'
+                report_row['metric'] = metric_name
+                metric_class = non_cv_battery[metric_name]['class']
+                kwargs = non_cv_battery[metric_name]['kwargs']
+                try:
+                    content = metric_class(y_pred, y_val, **kwargs)
+                except ValueError:
+                    content = np.nan
+                report_row['content'] = content
+                report.add_entries_to_report(report_row)
         i += 1
     print "All Models Fit and Evaluated. Writing Report"
     report.write_report()

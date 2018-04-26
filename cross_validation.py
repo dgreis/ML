@@ -19,10 +19,11 @@ class CrossValidator:
                 grid_template[param] = eval(hyper_params[param])
                 #TODO: This logic needs to be changed for new strategies, like random
             self.grid = list(dict(izip(grid_template, x)) for x in product(*grid_template.itervalues()))
-            self.hyperparam_cv_folds = model_config['hyperparam_tuning_settings']['num_folds']
             self.hyperparam_eval_metric = model_config['hyperparam_tuning_settings']['eval_metric']
         else:
             self.tune_hyperparams = False
+            self.grid = ['default']
+        self.cv_num_folds = project_settings['assessment']['cv_num_folds']
         self.evaluation_battery = load_evaluation_battery(project_settings)
         self.report_entries = dict()
         self.project_settings = project_settings
@@ -35,7 +36,7 @@ class CrossValidator:
             setattr(model,param,optimal_hyperparams[param])
         return model
 
-    def tune_hyperparams_via_cv(self, data, model):
+    def perform_cross_validation(self, data, model):
         """Example in models.yaml file:
         Models:
             Model Name:
@@ -46,49 +47,62 @@ class CrossValidator:
                     eval_metric: <metric>
         """
         grid = self.grid
-        num_folds = self.hyperparam_cv_folds
-        i = 0
-        num_settings = len(grid)
-        cv_results = dict()
-        results_df = pd.DataFrame({'setting': [], 'mean': [], 'sd': []})
+        num_folds = self.cv_num_folds
+        report_entries = pd.DataFrame({'dataset_name':[],'model_name':[],'setting': [], 'metric': [],'content': []})
         for setting in grid:
-            for param in setting:
-                setattr(model,param,setting[param])
-            model_name = str(setting)
-            report_entries = self.perform_cross_validation(data, model, num_folds, model_name)
-            i = i + num_folds
-            print("\tCV complete (" + str(i) + "/" + str(num_folds*num_settings) + ") models")
-            hyperparam_eval_metric = self.hyperparam_eval_metric
-            scores = report_entries[hyperparam_eval_metric][str(setting)]
-            cv_results[str(setting)] = scores
-            results_df = results_df.append({'setting' : str(setting)
-                              ,'mean': np.mean(cv_results[str(setting)])
-                              ,'sd': np.std(cv_results[str(setting)])
-                               },ignore_index=True)
-        means = results_df['mean']
-        stds = results_df['sd']
-        print("\t********* CV Results *********")
-        for mean, std, params in zip(means, stds, results_df['setting']):
-            print("\t%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
-        results_df = results_df.sort_values('mean',ascending=False).reset_index(drop=True)
-        print("\tBest hyperparam setting: " + results_df.loc[0,'setting'] + " @ " + str(results_df.loc[0,'mean']))
-        self.optimal_hyperparams = eval(results_df.loc[0,'setting'])
+            if grid != ['default']:
+                for param in setting:
+                    setattr(model,param,setting[param])
+            setting_name = str(setting)
+            print("\ttuning hyperparam for setting " + setting_name)
+            setting_folds_entries = self.do_folds(data, model, num_folds, setting_name)
+            setting_entries = self.aggregate_folds(setting_folds_entries)
+            report_entries = report_entries.append(setting_entries,ignore_index=True)
+        report_entries = self.filter_by_optimal_setting(report_entries)
+        return report_entries
 
-    def perform_cross_validation(self, data, model, num_folds, model_name):
+    def aggregate_folds(self,report_entries):
+        f = {'content': ['mean', 'std']}
+        g = report_entries.groupby([ 'dataset_name','model_name','setting','metric']
+                               ,as_index=False).agg(f)
+        new_col_names = ['_'.join(col).strip('_') for col in g.columns.values]
+        g.columns = new_col_names
+        g['content'] = g.apply(lambda x: (x['content_mean'],x['content_std']),axis=1)
+        return g.drop(['content_mean','content_std'],axis=1)
+
+    def filter_by_optimal_setting(self,report_entries):
+        if 'default' in report_entries['setting'].values:
+            return report_entries
+        else:
+            hyperparam_eval_metric = self.hyperparam_eval_metric
+            score_df = report_entries[report_entries['metric'] == hyperparam_eval_metric]
+            means = score_df['content'].apply(lambda x: x[0])
+            stds = score_df['content'].apply(lambda x: x[1])
+            print("\t********* CV Results *********")
+            for mean, std, params in zip(means, stds, score_df['setting']):
+                print("\t%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+            score_df['sort_value'] = score_df['content'].apply(lambda x: x[0])
+            score_df = score_df.sort_values('sort_value', ascending=False).reset_index(drop=True)
+            print("\tBest hyperparam setting: " + score_df.loc[0, 'setting'] + " @ " + str(score_df.loc[0, 'sort_value']))
+            self.optimal_hyperparams = eval(score_df.loc[0, 'setting'])
+            winning_setting = score_df.loc[0, 'setting']
+            return report_entries[report_entries['setting'] == winning_setting]
+
+    def do_folds(self, data, model, num_folds, setting_name):
         X_train_val, y_train_val = data['train_val']
         kf = KFold(num_folds)
         folds = list(kf.split(X_train_val,y_train_val))
-        report_entries = dict()
+        report_entries = pd.DataFrame()
         model_config = self.model_config
         project_settings = self.project_settings
-        chef = Manager(model_config, project_settings)
+        manager = Manager(model_config, project_settings)
         f = 1
         for fold in folds:
             ind_dev, ind_val = fold[0], fold[1]
             X_train,y_train = X_train_val.loc[ind_dev,:], pd.Series(y_train_val).loc[ind_dev].tolist()
-            X_train_p, y_train_p = chef.fit_transform(X_train,y_train,'train')
+            X_train_p, y_train_p = manager.fit_transform(X_train,y_train,'train')
             X_val,y_val = X_train_val.loc[ind_val,:], pd.Series(y_train_val).loc[ind_val].tolist()
-            X_val_p, y_val_p = chef.transform(X_val, y_val, 'val')
+            X_val_p, y_val_p = manager.transform(X_val, y_val, 'val')
             assert X_train_p.shape[1] == X_val_p.shape[1]
             assert len(y_val_p) == len(y_val)
             if f == 1:
@@ -101,15 +115,21 @@ class CrossValidator:
             y_pred = model.predict(X_val_p)
             evaluation_battery = self.evaluation_battery
             cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] == 'column'}
+            report_row = dict()
             for metric_name in cv_battery:
+                report_row['dataset_name'] = 'cross_validation'
+                report_row['model_name'] = model_config['model_name']
+                report_row['setting'] = setting_name
+                report_row['metric'] = metric_name
+                report_row['fold'] = f
                 metric_class = evaluation_battery[metric_name]['class']
                 kwargs = self._handle_kwargs(evaluation_battery[metric_name]['kwargs'])
-                if not report_entries.has_key(metric_name):
-                    report_entries[metric_name] = {model_name : []}
                 try:
-                    report_entries[metric_name][model_name].append(metric_class(y_pred, y_val_p, **kwargs))
+                    content = metric_class(y_pred, y_val_p, **kwargs)
                 except ValueError:
-                    report_entries[metric_name][model_name].append(np.nan)
+                    content = np.nan
+                report_row['content'] = content
+                report_entries = report_entries.append(report_row,ignore_index=True)
             f += 1
         return report_entries
 
