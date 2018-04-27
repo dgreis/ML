@@ -4,8 +4,12 @@ def load_evaluation_battery(project_settings):
     ml_problem_type = project_settings['ml_problem_type']
     if ml_problem_type == 'binary-classification':
         battery_keys = ['binary-classification','multiclass-classification']
-    else:
+    elif ml_problem_type == 'multiclass-classification':
         battery_keys =['multiclass-classification']
+    elif ml_problem_type == 'regression':
+        battery_keys = ['regression']
+    else:
+        raise NotImplementedError
     battery_settings = dict()
     for key in battery_keys:
         ind_battery_settings = project_settings['metrics'][key]['battery']

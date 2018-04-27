@@ -15,6 +15,20 @@ assessment:
   cv_num_folds: 5
 
 metrics:
+  regression:
+      battery:
+        explained_variance_score:
+          metric_type: column
+          kwargs: {}
+        mean_squared_error:
+          metric_type: column
+          kwargs: {}
+        median_absolute_error:
+          metric_type: column
+          kwargs: {}
+        r2_score:
+          metric_type: column
+          kwargs: {}
   binary-classification:
       battery:
         precision_recall_curve:

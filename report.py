@@ -42,7 +42,7 @@ class Report:
             for col in column_table.columns:
                 column_table[col] = column_table[col].apply(lambda x: "%0.3f (+/-%0.03f)" % (x[0], x[1] * 2))
             column_table_html = column_table.to_html()
-            f.write('<h1>Overall</h1>')
+            f.write('<h1>Cross-Validated Metrics</h1>')
             f.write(column_table_html)
             array_entries = report_entries[(report_entries['dataset_name'] == 'validation') &
                                             (report_entries['metric_type'] == 'array')].reset_index(drop=True)
