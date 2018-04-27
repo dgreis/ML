@@ -71,7 +71,8 @@ class FilterChain(ManipulatorChain):
             filtered_indices = list()
             for col in inv_column_map:
                 filtered_indices.append(orig_inv_column_map[col])
-            X_filt = X_mat.loc[:,filtered_indices]
+            sorted_filtered_indices = sorted(filtered_indices)
+            X_filt = X_mat.loc[:,sorted_filtered_indices]
         assert True not in pd.isnull(X_filt).any(1).value_counts()  # TODO: pandas dependent
         return X_filt, y
 

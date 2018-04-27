@@ -44,6 +44,8 @@ def main():
         X_val, y_val = manager.load_clean_datasets('val',project_settings)['val']
         X_val_p, y_val_p = manager.transform(X_val,y_val, 'val')
         y_pred = model.predict(X_val_p)
+        if model.gen_output_flag:
+            model.gen_output()
         evaluation_battery = load_evaluation_battery(project_settings)
         non_cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] != 'column'}
         report_row = dict()

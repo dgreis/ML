@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 
+from django.utils.text import slugify
 from utils import find_project_dir, load_working_file_filepath, load_inv_column_map
 
 class Wrapper(object):
@@ -35,7 +36,12 @@ class Wrapper(object):
         return self
 
     def predict(self,X):
-        return self.base_algorithm.predict(X)
+        y_pred =  self.base_algorithm.predict(X)
+        self.y_pred = y_pred
+        return y_pred
 
     def gen_output(self):
-        raise NotImplementedError
+        y_pred = self.y_pred
+        artifact_dir = self.artifact_dir
+        model_name = self.model_name
+        pd.Series(y_pred).to_csv(artifact_dir + '/' + slugify(model_name) + '-validation-scores.txt',sep='\t',header=False,index=False)
