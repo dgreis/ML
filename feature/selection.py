@@ -15,7 +15,6 @@ from sklearn.feature_selection import f_classif
 class FilterChain(ManipulatorChain):
 
     def __init__(self,filters, model_config, project_settings,original_columns=False):
-        model_config['feature_settings']['order'] = 0
         ManipulatorChain.__init__(self, filters, model_config, project_settings, original_columns)
         self.filters = filters
 
@@ -24,7 +23,7 @@ class FilterChain(ManipulatorChain):
         selection_module = importlib.import_module('feature.selection')
         filters = self.filters
         model_config = self.model_config
-        model_config['feature_settings']['order'] = -1
+        model_config['feature_settings']['order'] = 0
         project_settings = self.project_settings
         X_filt, y_filt = X_mat, y
         i = 1
@@ -37,8 +36,8 @@ class FilterChain(ManipulatorChain):
                 filter_class = getattr(selection_module,filter_name)
                 fit_args = self._get_args(filter_class, 'fit')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], fit_args)
-                model_config['feature_settings']['order'] += 1
                 filter_instance = filter_class(model_config,project_settings)
+                model_config['feature_settings']['order'] += 1
                 kwargs = dict()
                 for arg in additional_args:
                     kwargs[arg] = getattr(self,arg)
@@ -80,9 +79,6 @@ class FilterChain(ManipulatorChain):
         assert len(entry.keys()) == 1
         key = entry.keys()[0]
         return entry[key]['initialized_filter']
-
-    def det_prior_feature_names_filepath(self,model_config):
-        pass
 
 class Filter(Manipulator):
 

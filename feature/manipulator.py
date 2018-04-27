@@ -1,5 +1,5 @@
 import inspect
-
+import importlib
 import pandas as pd
 import os
 
@@ -20,19 +20,31 @@ class Manipulator(object):
             os.makedirs(artifact_dir)
         self.artifact_dir = artifact_dir
         self.features = None
-        if len(manipulations) > 0:
-            manipulator_names = [d.keys()[0] for d in manipulations]
-            order = model_config['feature_settings']['order']
-            if order <= 0:
-                prior_manipulator_feature_names_filepath = self.det_prior_feature_names_filepath(model_config)
+        if not self.is_manipulator_chain():
+            if len(manipulations) > 0:
+                manipulator_names = [d.keys()[0] for d in manipulations]
+                order = model_config['feature_settings']['order']
+                if order == 0:
+                    prior_manipulator_feature_names_filepath = self.det_prior_feature_names_filepath(model_config)
+                    manipulator_name = manipulator_names[0]
+                else:
+                    prior_transform = manipulator_names[order-1]
+                    prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_transform)
+                    manipulator_name = manipulator_names[order]
+                self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
+                self.manipulator_name = manipulator_name
             else:
-                prior_transform = manipulator_names[order-1]
-                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_transform)
-            self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
-            manipulator_name = manipulator_names[order]
-            self.manipulator_name = manipulator_name
+                pass
+
+    def is_manipulator_chain(self):
+        #TODO: Find a better way to do this
+        manipulator_module = importlib.import_module('feature.manipulator')
+        if self.__class__.__bases__[0] == getattr(manipulator_module,'ManipulatorChain'):
+            return True
+        elif self.__class__.__bases__[0].__bases__[0] == getattr(manipulator_module,'ManipulatorChain'):
+            return True
         else:
-            pass
+            return False
 
     def det_prior_feature_names_filepath(self,model_config):
         raise NotImplementedError

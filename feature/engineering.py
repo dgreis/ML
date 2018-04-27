@@ -19,7 +19,7 @@ class TransformChain(ManipulatorChain):
 
     def __init__(self,starting_transformations, model_config, project_settings,original_columns=False):
         updated_transformations = list()
-        model_config['feature_settings']['order'] = -1
+        model_config['feature_settings']['order'] = 0
         engineering_module = importlib.import_module('feature.engineering')
         for transformation in starting_transformations:
             engineering_module = importlib.import_module('feature.engineering')
@@ -40,9 +40,6 @@ class TransformChain(ManipulatorChain):
                 updated_transformations = updated_transformations + [transformation]
         super(TransformChain,self).__init__(updated_transformations, model_config, project_settings,original_columns)
         self.transformations = updated_transformations
-
-    def det_prior_feature_names_filepath(self,model_config):
-        pass
 
     def fit(self,X_mat,y,dataset_name):
         log_prefix = "[" + dataset_name + "]"
