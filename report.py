@@ -58,7 +58,8 @@ class Report:
                     array_table_html = array_table.to_html()
                     f.write(array_table_html)
             cr_entries = report_entries[(report_entries['dataset_name'] == 'validation') & (report_entries['metric_type'] == 'classification_report')].reset_index(drop=True)
-            f.write("<h1>" + 'classification_report' + "</h1>")
+            if len(cr_entries) > 0:
+                f.write("<h1>" + 'classification_report' + "</h1>")
             for i in range(len(cr_entries)):
                 row = dict(cr_entries.iloc[i])
                 f.write("<h3>" + row['model_name'] + "</h3>")
