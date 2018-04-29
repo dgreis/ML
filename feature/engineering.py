@@ -330,10 +330,22 @@ class standard_scale(Transformer):
         return Xt_feat_names
 
 class pca(Transformer):
+    """
+    example yaml usage:
+<model_name>
+    feature_settings:
+      feature_engineering:
+        - pca:
+            inclusion_patterns:
+             - <pattern>
+            kwargs:
+              n_components: <int>
+    """
 
     def __init__(self, model_config, project_settings):
         super(pca, self).__init__(model_config, project_settings )
         self.set_base_transformer(PCA(**self.kwargs))
+        self.configure_ancestors_and_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         num_comps = self.base_transformer.n_components
