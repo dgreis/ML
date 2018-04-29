@@ -27,8 +27,7 @@ class TransformChain(ManipulatorChain):
             transform_class = getattr(engineering_module, transformer_name)
             if transform_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
                 transform_chain_class = transform_class
-                transform_chain_offset = [st.keys()[0] for st in starting_transformations].index(transformer_name) +1
-                tc = transform_chain_class(starting_transformations[:transform_chain_offset],model_config,project_settings,original_columns)
+                tc = transform_chain_class(starting_transformations,model_config,project_settings,original_columns)
                 updated_transformations = tc.transformations
             else:
                 transformer_name = transformation.keys()[0]
@@ -289,12 +288,16 @@ class interaction_terms(TransformChain):
         int_idx = transformation_names.index('interaction_terms')
         if int_idx == 0:
             transformations = expanded_transformations + transformations[1:]
+            exp_idx = len(expanded_transformations)
         elif int_idx < len(transformations) - 1:
             transformations = transformations[0:int_idx] + expanded_transformations +transformations[int_idx+1:]
+            #TODO: implement exp_idx
+            raise NotImplementedError
         else:
             transformations = transformations[:-1] + expanded_transformations
+            exp_idx = len(transformations[:-1]) + len(expanded_transformations)
         model_config['feature_settings']['feature_engineering'] = transformations
-        super(interaction_terms, self).__init__(transformations, model_config, project_settings,original_columns)
+        super(interaction_terms, self).__init__(transformations[:exp_idx], model_config, project_settings,original_columns)
 
 class normalize(Transformer):
 
