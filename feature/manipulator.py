@@ -64,7 +64,7 @@ class Manipulator(object):
         output_features_filepath = self._det_output_features_filepath(manipulator_name)
         pd.Series(self.features).to_csv(output_features_filepath, index=False, sep='\t')
 
-    def gen_new_column_names(self, orig_tcol_idx, working_features):
+    def gen_new_column_names(self, touch_indices, prior_features):
         raise NotImplementedError
 
     def split(self, X_mat, y_mat):
@@ -72,7 +72,7 @@ class Manipulator(object):
         touch_indices = self.touch_indices
         X_untouched = X_mat.loc[:,untouched_indices]
         X_touch = X_mat.loc[:,touch_indices]
-        return X_touch, X_untouched, None, y_mat
+        return X_touch, X_untouched, y_mat, None
 
     def reindex(self, prior_features, new_features=list()):
         untouched_indices = self.untouched_indices

@@ -4,6 +4,7 @@ import importlib
 import itertools
 
 import pandas as pd
+import numpy as np
 import numpy.random as npr
 
 from manipulator import ManipulatorChain, Manipulator
@@ -12,6 +13,8 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from statsmodels.nonparametric.smoothers_lowess import lowess
+from scipy.interpolate import interp1d
 
 from django.utils.text import slugify
 
@@ -40,19 +43,20 @@ class TransformChain(ManipulatorChain):
         super(TransformChain,self).__init__(updated_transformations, model_config, project_settings,original_columns)
         self.transformations = updated_transformations
 
-    def fit(self,X_mat,y,dataset_name):
-        log_prefix = "[" + dataset_name + "]"
-        transformations = self.transformations
-        i = 1
-        for d in transformations:
-            transformer_name = d.keys()[0]
-            #print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
-            #    len(transformations)) + "): " + transformer_name
-            transformer = d[transformer_name]['initialized_transformer']
-            transformer.fit(X_mat,y)
-            i += 1
+    # def fit(self,X_mat,y,dataset_name):
+    #     log_prefix = "[" + dataset_name + "]"
+    #     transformations = self.transformations
+    #     i = 1
+    #     for d in transformations:
+    #         transformer_name = d.keys()[0]
+    #         #print "\t" + log_prefix + " Performing feature engineering (" + str(i) + '/' + str(
+    #         #    len(transformations)) + "): " + transformer_name
+    #         transformer = d[transformer_name]['initialized_transformer']
+    #         X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y)
+    #         transformer.fit(X_touch,y_touch)
+    #         i += 1
 
-    def transform(self,X_mat,y,dataset_name):
+    def transform(self,X_mat,y,dataset_name,fit_transform=False):
         transformations = self.transformations
         if len(transformations) < 1:
             X_transform, y_transform = X_mat, y
@@ -62,6 +66,8 @@ class TransformChain(ManipulatorChain):
                 transformer_name = d.keys()[0]
                 transformer = d[transformer_name]['initialized_transformer']
                 X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y)
+                if fit_transform:
+                    transformer.fit(X_touch,y_touch)
                 X_touched, y_touched = transformer.transform(X_touch,y_touch)
                 #fit_transform_args = self._get_args(transform_class, 'fit_transform')
                 #additional_args = filter(lambda x: x not in ['X_touch','working_features'], fit_transform_args)
@@ -80,8 +86,7 @@ class TransformChain(ManipulatorChain):
         return X_transform, y_transform
 
     def fit_transform(self,X_mat,y,dataset_name):
-        self.fit(X_mat,y,dataset_name)
-        return self.transform(X_mat,y,dataset_name)
+        return self.transform(X_mat,y,dataset_name,fit_transform=True)
 
 class Transformer(Manipulator):
 
@@ -140,8 +145,8 @@ class Transformer(Manipulator):
     def set_base_transformer(self,transformer_instance):
         self.base_transformer = transformer_instance
 
-    def fit(self,X_mat,y):
-        pass
+    def fit(self,X_touch,y_touch,**kwargs):
+        self.base_transformer.fit(X_touch,y_touch,**kwargs)
 
     def determine_split_indices(self, prior_features):
         #TODO: Better name this fn?
@@ -167,7 +172,7 @@ class Transformer(Manipulator):
         return touch_indices, untouched_indices
 
     def transform(self, X_touch, y_touch, **kwargs):
-        X_touched = self.base_transformer.fit_transform(X_touch,**kwargs)
+        X_touched = self.base_transformer.transform(X_touch,**kwargs)
         if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
             rdf = pd.DataFrame(X_touched,index=X_touch.index)
         else:
@@ -184,10 +189,10 @@ class Transformer(Manipulator):
         features = self.features
         assert len(features) == X_transform.shape[1]
         X_transform.columns = range(len(features))
-        if y_touched is not None:
+        if y_untouched is not None:
             print "this is mean to be a vertical transform. y_touched is not None which seems like a horizontal transform"
             raise Exception
-        return X_transform, y_untouched
+        return X_transform, y_touched
 
     def store_output(self,X_mat,output_dir): #TODO: When I need to output filter, make this an abstract method in new ManipulatorChain class
         model_name = self.model_name
@@ -400,6 +405,56 @@ class LeaveOneOutEncoder:
         assert len(loo_vals) == len(X_mat)
         return pd.DataFrame(pd.Series(loo_vals))
 
+class interpolate(Transformer):
+    """Example in models.yaml file:
+    Models:
+      <model name>:
+       feature_settings:
+         feature_engineering:
+           - interpolate
+               inclusion_patterns
+                 - <pattern>
+                kwargs:
+                    lowess: {}
+                    interp1d: {}
+    """
+    def __init__(self, model_config, project_settings):
+        super(interpolate, self).__init__(model_config, project_settings)
+        self.set_base_transformer(None)
+        self.configure_ancestors_and_features()
+
+    def fit(self,X_mat,y):
+        kwargs = self.kwargs
+        lowess_kwargs = kwargs['lowess']
+        interp1d_kwargs = kwargs['interp1d']
+
+        assert X_mat.shape[1] == 1 #For now, just one feature per transformer
+
+        fitted_lowess = lowess(X_mat.iloc[:,0], np.array(y),**lowess_kwargs)
+
+        # unpack the lowess smoothed points to their values
+        lowess_x = list(zip(*fitted_lowess))[0]
+        lowess_y = list(zip(*fitted_lowess))[1]
+
+        # run scipy's interpolation. There is also extrapolation I believe
+        f = Interpolator(lowess_x, lowess_y,bounds_error=False,**interp1d_kwargs)
+
+        self.set_base_transformer(f)
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        assert len(touch_indices) == 1
+        touch_idx = touch_indices[0]
+        old_feature_name = prior_features[touch_idx]
+        new_feature_name = 'interp(' + old_feature_name + ')'
+        return [new_feature_name]
+
+class Interpolator(interp1d):
+
+    def __init__(self,x,y,**kwargs):
+        super(Interpolator,self).__init__(x,y,**kwargs)
+
+    def transform(self,x):
+        return self(x)
 
 class sample(Transformer):
     """Example in models.yaml file:

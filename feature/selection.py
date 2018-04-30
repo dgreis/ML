@@ -47,7 +47,7 @@ class FilterChain(ManipulatorChain):
                 filter_instance.features = reindexed_features
                 filter_instance.output_features()
                 d[filter_name]['initialized_filter'] = filter_instance
-                _, X_filt, _, y_filt = filter_instance.split(X_filt, y)
+                _, X_filt, y_filt, _ = filter_instance.split(X_filt, y)
                 assert True not in pd.isnull(X_filt).any(1).value_counts() #TODO: pandas dependent
                 X_filt.columns = filter_instance.features.keys()
                 i += 1
