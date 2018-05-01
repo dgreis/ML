@@ -30,7 +30,8 @@ class TransformChain(ManipulatorChain):
             transform_class = getattr(engineering_module, transformer_name)
             if transform_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
                 transform_chain_class = transform_class
-                tc = transform_chain_class(starting_transformations,model_config,project_settings,original_columns)
+                working_transformations = model_config['feature_settings']['feature_engineering']
+                tc = transform_chain_class(working_transformations,model_config,project_settings,original_columns)
                 updated_transformations = tc.transformations
             else:
                 transformer_name = transformation.keys()[0]
