@@ -125,6 +125,7 @@ class Transformer(Manipulator):
         prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
         prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
         prior_features = flip_dict(prior_inv_col_map)
+        self.prior_features = prior_features
         touch_indices, untouched_indices = self.determine_split_indices(prior_features)
         new_features = self.gen_new_column_names(touch_indices, prior_features)
         self.touch_indices = touch_indices
@@ -455,6 +456,55 @@ class Interpolator(interp1d):
 
     def transform(self,x):
         return self(x)
+
+class as_numeric(Transformer):
+    """Example in models.yaml file:
+    Models:
+      <model name>:
+       feature_settings:
+         feature_engineering:
+           - as_numeric
+               inclusion_patterns
+                 - <pattern>
+    """
+    def __init__(self,model_config, project_settings):
+        super(as_numeric, self).__init__(model_config, project_settings)
+        self.configure_ancestors_and_features()
+        self.set_base_transformer(InvOneHotEncoder(self.touch_indices, self.prior_features))
+
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        prior_feature_cols = [prior_features[ti] for ti in touch_indices]
+        base_names = [pfc.split('_')[0] for pfc in prior_feature_cols]
+        assert len(set(base_names)) == 1
+        base_name = 'as_numeric(' + base_names[0] + ')'
+        return [base_name]
+
+class InvOneHotEncoder:
+
+    def __init__(self,touch_indices, prior_features, **kwargs):
+        self.prior_features = prior_features
+        self.touch_indices = touch_indices
+
+        idx_val_map = dict()
+
+        for ti in touch_indices:
+            prior_feature_col = prior_features[ti]
+            value = float(prior_feature_col.split('_')[1])
+            idx_val_map[ti] = value
+
+        self.idx_val_map = idx_val_map
+
+
+    def fit(self,X,y):
+        pass
+
+    def transform(self,X_touch):
+        #Pandas dependent
+        max_col = X_touch.idxmax(1)
+        idx_val_map = self.idx_val_map
+        num_column = max_col.apply(lambda x: idx_val_map[x])
+        return num_column
 
 class sample(Transformer):
     """Example in models.yaml file:
