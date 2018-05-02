@@ -13,13 +13,11 @@ Models:
                 gen_output: True
 
 
-
-
   #Random_Forest:
   #    base_class: Random_Forest_Classifier
 
-  #Neural_Network:
-  #    base_class: MultiLayer_Perceptron_NN_Classifier
+  Neural_Network:
+      base_algorithm: sklearn.neural_network.MLPClassifier
 
 
   #SVC with CV:

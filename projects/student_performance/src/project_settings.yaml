@@ -1,0 +1,18 @@
+project_name : "student_performance"
+ml_problem_type: 'regression'
+data_dir : "data/"
+#parse_sep : "'\s+"
+parse_engine: "python"
+train_test_split: 0.8
+raw_input_files:
+  X : "student/student-por.csv"
+clean_input_files:
+  X_train : "processed/X_train.txt"
+  y_train : "processed/y_train.txt"
+  X_train_val: "processed/X_train_val.txt"
+  y_train_val: "processed/y_train_val.txt"
+  X_val: "processed/X_val.txt"
+  y_val: "processed/y_val.txt"
+  X_test: "processed/X_test.txt"
+  y_test : "processed/y_test.txt"
+  feature_names: "processed/features.txt"

@@ -1,0 +1,221 @@
+Models:
+
+#  Linear Regression:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+
+
+#  Linear Regression numeric failures:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#         - as_numeric:
+#            inclusion_patterns:
+#              - "failures"
+
+#  Linear Regression test more numeric:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#         - as_numeric:
+#            inclusion_patterns:
+#              - "failures"
+#              - "fedu"
+#              - "medu"
+#              - "traveltime"
+#              - "studytime"
+
+
+#  Linear Reg with Lowess(walc):
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#        - interpolate:
+#            inclusion_patterns:
+#              - "g2"
+#            kwargs:
+#              lowess: {}
+#              interp1d: {}
+
+#  Linear Regression with f_based (K=5):
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_selection:
+#        - f_based:
+#            keyword_arg_settings: {}
+#            other_options:
+#              k: 5
+
+
+  Linear Regression with f_based and inter (K=5):
+    base_algorithm: sklearn.linear_model.LinearRegression
+    feature_settings:
+      feature_engineering:
+        - interaction_terms:
+           interactions:
+            - "('g1','g2')"
+      feature_selection:
+        - f_based:
+            keyword_arg_settings: {}
+            other_options:
+              k: 5
+
+  Linear Regression with inter (K=8) all numeric:
+    base_algorithm: sklearn.linear_model.LinearRegression
+    feature_settings:
+      feature_engineering:
+        - interaction_terms:
+           interactions:
+            - "('g1','g2')"
+        - as_numeric:
+           inclusion_patterns:
+              - "failures"
+              - "fedu"
+              - "medu"
+              - "traveltime"
+              - "studytime"
+      feature_selection:
+        - f_based:
+            keyword_arg_settings: {}
+            other_options:
+              k: 8
+
+
+###Normalizing actually reduced CV metrics
+
+#  Linear Regression with inter (K=8) all numeric and normed:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#           interactions:
+#            - "('g1','g2')"
+#        - as_numeric:
+#           inclusion_patterns:
+#              - "failures"
+#              - "fedu"
+#              - "medu"
+#              - "traveltime"
+#              - "studytime"
+#        - normalize:
+#            inclusion_patterns:
+#              - "failures"
+#              - "fedu"
+#              - "medu"
+#              - "traveltime"
+#              - "studytime"
+#              - "g1"
+#              - "g2"
+#              - 'freetime'
+#              - 'goout'
+#              - 'dalc'
+#              - 'walc'
+#              - 'health'
+#              - 'absences'
+#      feature_selection:
+#        - f_based:
+#            keyword_arg_settings: {}
+#            other_options:
+#              k: 8
+
+#  Linear Regression with inter (K=9) all numeric:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#           interactions:
+#            - "('g1','g2')"
+#        - as_numeric:
+#           inclusion_patterns:
+#              - "failures"
+#              - "fedu"
+#              - "medu"
+#              - "traveltime"
+#              - "studytime"
+#      feature_selection:
+#        - f_based:
+#            keyword_arg_settings: {}
+#            other_options:
+#              k: 9
+
+#  Linear Regression with f_based and normed inter (K=6):
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    other_options:
+#      gen_output: True
+#    feature_settings:
+#      feature_engineering:
+#        - normalize:
+#           inclusion_patterns:
+#              - 'g1'
+#              - 'g2'
+#        - interaction_terms:
+#           interactions:
+#            - "('norm(g1)','norm(g2)')"
+#      feature_selection:
+#        - f_based:
+#            keyword_arg_settings: {}
+#            other_options:
+#              k: 6
+
+#  PCA Linear Regression 4-Comps:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    other_options:
+#      gen_output: True
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#           interactions:
+#            - "('g1','g2')"
+#        - pca:
+#            inclusion_patterns:
+#             - "All"
+#            kwargs:
+#              n_components: 4
+
+#  Linear Regression with l1_based and inter:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#           interactions:
+#            - "('g1','g2')"
+#      feature_selection:
+#        - l1_based:
+#           method: "LinearSVC"
+#           kwargs:
+#             dual: False
+
+#  RF with f_based and inter (K=5):
+#    base_algorithm: sklearn.ensemble.RandomForestRegressor
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#           interactions:
+#            - "('g1','g2')"
+#      feature_selection:
+#        - f_based:
+#            keyword_arg_settings: {}
+#            other_options:
+#              k: 5
+
+#  RF with inter:
+#    base_algorithm: sklearn.ensemble.RandomForestRegressor
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#           interactions:
+#            - "('g1','g2')"
+#
+
+  Base RF:
+    base_algorithm: sklearn.ensemble.RandomForestRegressor
+
+  RF with 500 Trees:
+    base_algorithm: sklearn.ensemble.RandomForestRegressor
+    keyword_arg_settings:
+      n_estimators: 500
+      min_samples_leaf: 5
+      max_features: 25
+
+
+#  Base NN:
+#    base_algorithm: sklearn.neural_network.MLPClassifier

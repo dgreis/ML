@@ -1,40 +1,144 @@
 Models:
 
-  Logistic Regression:
-    base_algorithm: sklearn.linear_model.LogisticRegression
+#  Logistic Regression:
+#    base_algorithm: sklearn.linear_model.LogisticRegression
 
-  Logistic with Interactions & Basis:
-    base_algorithm: sklearn.linear_model.LogisticRegression
+
+#  Logistic with Interactions (K=7):
+                   ##    base_algorithm: sklearn.linear_model.LogisticRegression
+                   ##    feature_settings:
+                   ##      feature_engineering:
+                   ##        - interaction_terms:
+                   ##            interactions:
+                   ##              - "('bill_sep','hist_sep')"
+                   ##              - "('bill_sep','prepay_sep')"
+                   ##      feature_selection:
+                   ##        - f_based:
+                   ##            other_options:
+                   ##              k: 7
+
+#  Logistic with Interactions (K=10):
+#    base_algorithm: sklearn.linear_model.LogisticRegression
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#            interactions:
+#              - "('bill_sep','hist_sep')"
+#              - "('bill_sep','prepay_sep')"
+#      feature_selection:
+#        - f_based:
+#            other_options:
+#              k: 10
+
+  GBC with Interactions:
+    base_algorithm: sklearn.ensemble.GradientBoostingClassifier
     feature_settings:
       feature_engineering:
         - interaction_terms:
             interactions:
               - "('bill_sep','hist_sep')"
               - "('bill_sep','prepay_sep')"
-        - intx.basis_expansion:
-            inclusion_patterns:
-              - "hist_sep"
-            kwargs:
-              include_bias: False
-              interaction_only: False
-
-  Logistic Just Basis:
-    base_algorithm: sklearn.linear_model.LogisticRegression
-    feature_settings:
-      feature_engineering:
-        - intx.basis_expansion:
-            inclusion_patterns:
-              - "hist_sep"
-            kwargs:
-              include_bias: False
-              interaction_only: False
 
 
-  Logistic with Interactions:
-    base_algorithm: sklearn.linear_model.LogisticRegression
+  KNN Classification with Interactions:
+    base_algorithm: sklearn.neighbors.KNeighborsClassifier
     feature_settings:
       feature_engineering:
         - interaction_terms:
             interactions:
               - "('bill_sep','hist_sep')"
               - "('bill_sep','prepay_sep')"
+
+
+  GBC with Interactions & K=10:
+    base_algorithm: sklearn.ensemble.GradientBoostingClassifier
+    feature_settings:
+      feature_engineering:
+        - interaction_terms:
+            interactions:
+              - "('bill_sep','hist_sep')"
+              - "('bill_sep','prepay_sep')"
+      feature_selection:
+        - f_based:
+            other_options:
+              k: 10
+
+  GBC with Interactions & K=10 with tuning:
+    base_algorithm: sklearn.ensemble.GradientBoostingClassifier
+    hyperparam_tuning_settings:
+      eval_metric: 'f1_score'
+      hyperparams:
+        learning_rate: "[0.1, 1]"
+        n_estimators: "[2000]"
+    feature_settings:
+      feature_engineering:
+        - interaction_terms:
+            interactions:
+              - "('bill_sep','hist_sep')"
+              - "('bill_sep','prepay_sep')"
+      feature_selection:
+        - f_based:
+            other_options:
+              k: 10
+
+  MLP with Interactions & K=10:
+    base_algorithm: sklearn.neural_network.MLPClassifier
+    #keyword_arg_settings:
+      #hidden_layer_sizes: (30,30,30)
+    hyperparam_tuning_settings:
+      eval_metric: 'f1_score'
+      hyperparams:
+        activation: "['relu','identity','logistic','tanh']"
+        hidden_layer_sizes: "[(30,30,30)]"
+    feature_settings:
+      feature_engineering:
+        - interaction_terms:
+            interactions:
+              - "('bill_sep','hist_sep')"
+              - "('bill_sep','prepay_sep')"
+      feature_selection:
+        - f_based:
+            other_options:
+              k: 10
+
+
+#  SVC with Interactions & K=10:
+#    base_algorithm: sklearn.svm.LinearSVC
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#            interactions:
+#              - "('bill_sep','hist_sep')"
+#              - "('bill_sep','prepay_sep')"
+#      feature_selection:
+#        - f_based:
+#            other_options:
+#              k: 10
+
+#  Logistic with Interactions (K=12):
+#    base_algorithm: sklearn.linear_model.LogisticRegression
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#            interactions:
+#              - "('bill_sep','hist_sep')"
+#              - "('bill_sep','prepay_sep')"
+#      feature_selection:
+#        - f_based:
+#            other_options:
+#              k: 12
+
+
+#  Logistic with Interactions l1-FS:
+#    base_algorithm: sklearn.linear_model.LogisticRegression
+#    feature_settings:
+#      feature_engineering:
+#        - interaction_terms:
+#            interactions:
+#              - "('bill_sep','hist_sep')"
+#              - "('bill_sep','prepay_sep')"
+#      feature_selection:
+#        - l1_based:
+#            method: "LinearSVC"
+#            kwargs:
+#              dual: False
