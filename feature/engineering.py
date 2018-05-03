@@ -320,7 +320,19 @@ class interaction_terms(TransformChain):
         super(interaction_terms, self).__init__(transformations[:exp_idx], model_config, project_settings,original_columns)
 
 class normalize(Transformer):
-
+    """
+    Models:
+      <model name>
+        base_algorithm: <algorithm>
+          feature_settings:
+            feature_engineering:
+              - normalize:
+                  inclusion_patterns:
+                    - <pattern>
+     (You can also specify 'All Numeric' to normalize all numeric columns, provided
+     that you include a list of the numeric feature names in the project_settings yaml
+     file in the src folder of the project directory)
+    """
     def __init__(self, model_config, project_settings):
         super(normalize, self).__init__(model_config, project_settings )
         self.set_base_transformer(Normalizer(**self.kwargs))
@@ -336,10 +348,23 @@ class normalize(Transformer):
 
 
 class standard_scale(Transformer):
-
+    """
+    Models:
+      <model name>
+        base_algorithm: <algorithm>
+          feature_settings:
+            feature_engineering:
+              - standard_scale:
+                  inclusion_patterns:
+                    - <pattern>
+     (You can also specify 'All Numeric' to scale all numeric columns, provided
+     that you include a list of the numeric feature names in the project_settings yaml
+     file in the src folder of the project directory)
+    """
     def __init__(self, model_config, project_settings):
         super(standard_scale, self).__init__(model_config, project_settings )
         self.set_base_transformer(StandardScaler(**self.kwargs))
+        self.configure_ancestors_and_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         Xt_feat_names = list()
