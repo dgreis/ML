@@ -161,6 +161,16 @@ class Transformer(Manipulator):
         if inclusion_patterns == ['All']:
             touch_indices = range(len(prior_features))
             untouched_indices = list()
+        elif inclusion_patterns == ['All Numeric']:
+            project_settings = self.project_settings
+            if not project_settings.has_key('numeric_features'):
+                print "Must specify numeric features as numeric_features:[feature_name<1>, feature_name<2>..." \
+                      "in project_settings file "
+                raise Exception
+            else:
+                numeric_feature_names = project_settings['numeric_features']
+                touch_indices = [inv_working_features[n] for n in numeric_feature_names]
+                untouched_indices = list(set(col_indices).difference(set(touch_indices)))
         else:
             for pattern in inclusion_patterns:
                 len_pat = len(pattern)
