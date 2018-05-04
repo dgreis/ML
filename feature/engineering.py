@@ -382,7 +382,7 @@ class pca(Transformer):
       feature_engineering:
         - pca:
             inclusion_patterns:
-             - <pattern>
+             - 'All'
             kwargs:
               n_components: <int>
     """
