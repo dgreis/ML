@@ -2,7 +2,7 @@ import pandas as pd
 
 from feature.engineering import TransformChain
 from feature.selection import FilterChain
-from utils import find_data_dir
+from utils import find_data_dir, load_clean_input_file_filepath, load_inv_column_map, flip_dict
 
 
 
@@ -24,7 +24,7 @@ class Manager:
             fc = FilterChain(filters, model_config, project_settings)
             X_1st, y_1st = fc.fit_transform(X, y, dataset_name)
             tc = TransformChain(transformations, model_config, project_settings)
-            X_2nd, y_2nd = tc.fit_transform(X_1st, y_1st)
+            X_2nd, y_2nd = tc.fit_transform(X_1st, y_1st,dataset_name)
         else:
             tc = TransformChain(transformations, model_config, project_settings)
             X_1st, y_1st = tc.fit_transform(X, y,dataset_name)
@@ -42,6 +42,7 @@ class Manager:
     def transform(self,X, y, dataset_name):
 
         model_config = self.model_config
+        project_settings = self.project_settings
 
         fc = self.fc
         tc = self.tc
@@ -49,9 +50,21 @@ class Manager:
         if model_config['feature_settings']['select_before_eng']:
             X_1st, y_1st = fc.transform(X,y,dataset_name)
             X_2nd, y_2nd = tc.transform(X_1st,y_1st, dataset_name)
+            total_manipulations = fc.filters + tc.transformations
         else:
             X_1st, y_1st = tc.transform(X,y, dataset_name)
             X_2nd, y_2nd = fc.transform(X_1st,y_1st, dataset_name)
+            total_manipulations = tc.transformations + fc.filters
+
+        if len(total_manipulations) > 0:
+            manipulator_name = total_manipulations[-1].keys()[0]
+            manipulator = [v for (k,v) in total_manipulations[-1][manipulator_name].items() if 'initialized' in k][0]
+            setattr(self,'working_features',manipulator.features)
+        else:
+            filepath = load_clean_input_file_filepath(project_settings,'feature_names')
+            inv_column_map = load_inv_column_map(filepath)
+            setattr(self,'working_features',flip_dict(inv_column_map))
+
 
         return X_2nd, y_2nd
 

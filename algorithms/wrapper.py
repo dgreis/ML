@@ -33,6 +33,8 @@ class Wrapper(object):
             setattr(self,'coef_',getattr(self.base_algorithm,'coef_'))
         if hasattr(self.base_algorithm,'feature_importances_'):
             setattr(self,'feature_importances_',getattr(self.base_algorithm,'feature_importances_'))
+        if hasattr(self.base_algorithm,'estimators_'):
+            setattr(self,'estimators_',getattr(self.base_algorithm,'estimators_'))
         return self
 
     def predict(self,X):
@@ -45,3 +47,6 @@ class Wrapper(object):
         artifact_dir = self.artifact_dir
         model_name = self.model_name
         pd.Series(y_pred).to_csv(artifact_dir + '/' + slugify(model_name) + '-validation-scores.txt',sep='\t',header=False,index=False)
+
+    def set_features(self, working_features):
+        setattr(self,'features', working_features)
