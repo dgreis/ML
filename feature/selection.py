@@ -44,7 +44,8 @@ class FilterChain(ManipulatorChain):
                 filter_instance.fit(X_filt,y_filt,**kwargs)
                 features = filter_instance.features
                 reindexed_features = filter_instance.reindex(features)
-                filter_instance.features = reindexed_features
+                #filter_instance.features = reindexed_features
+                setattr(filter_instance,'features',reindexed_features)
                 filter_instance.output_features()
                 d[filter_name]['initialized_filter'] = filter_instance
                 _, X_filt, y_filt, _ = filter_instance.split(X_filt, y)
@@ -72,6 +73,7 @@ class FilterChain(ManipulatorChain):
                 filtered_indices.append(orig_inv_column_map[col])
             sorted_filtered_indices = sorted(filtered_indices)
             X_filt = X_mat.loc[:,sorted_filtered_indices]
+            X_filt.columns = final_filter.features.keys()
         assert True not in pd.isnull(X_filt).any(1).value_counts()  # TODO: pandas dependent
         return X_filt, y
 
@@ -135,7 +137,7 @@ class exclude_features(Filter):
         super(exclude_features, self).__init__(model_config, project_settings)
         self.patterns = self.fetch_filter_settings('exclude_features')
 
-    def fit(self,**kwargs):
+    def fit(self,X_mat,y,**kwargs):
         prior_manipulator_feature_names_filepath = self.prior_manipulator_feature_names_filepath
         inv_column_map = load_inv_column_map(prior_manipulator_feature_names_filepath)
         prior_features = flip_dict(inv_column_map)
