@@ -60,6 +60,7 @@ class TransformChain(ManipulatorChain):
     #         i += 1
 
     def transform(self,X_mat,y,dataset_name,fit_transform=False):
+        X_mat_start = X_mat.copy()
         transformations = self.transformations
         if len(transformations) < 1:
             X_transform, y_transform = X_mat, y
@@ -195,7 +196,7 @@ class Transformer(Manipulator):
 
     def combine(self,X_touched,X_untouched,y_touched,y_untouched):
         """Pandas Dependent"""
-        if len(X_untouched) > 0:
+        if X_untouched.shape[1] > 0:
             X_transform = pd.merge(X_untouched, X_touched, left_index=True, right_index=True)
             assert len(X_transform) == len(X_untouched) == len(X_touched)
         else:
@@ -725,10 +726,40 @@ class predict(Transformer):
 
     def transform(self,X_touch,y_touch):
         base_algo_instance = self.base_transformer
-        col_loc = X_touch.shape[1]
+        col_loc = X_touch.columns.max() + 1
+        ow = X_touch.shape[1]
         X_touch.loc[:,col_loc] = base_algo_instance.predict(X_touch)
-        assert X_touch.shape[1] > col_loc
+        assert X_touch.shape[1] > ow
         return X_touch, y_touch
+
+class reset_data(Transformer):
+
+    def __init__(self,model_config,project_settings):
+        super(reset_data, self).__init__(model_config, project_settings )
+        self.set_base_transformer(Resetter(**self.kwargs))
+        self.configure_ancestors_and_features()
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        project_settings = self.project_settings
+        clean_feature_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+        clean_features = load_inv_column_map(clean_feature_filepath)
+        return clean_features.keys()
+
+    def transform(self,X_touch,y_touch,X_mat_start):
+        return self.base_transformer.transform(X_mat_start), y_touch
+
+class Resetter:
+
+    def __init__(self):
+        pass
+
+    def fit(self,X_touch,y_touch):
+        pass
+
+    def transform(self,X_mat_start):
+        return X_mat_start
+
+
 
 
 
