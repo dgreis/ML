@@ -8,7 +8,9 @@ import numpy as np
 import numpy.random as npr
 
 from manipulator import ManipulatorChain, Manipulator
+from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
+from algorithms.algoutils import get_algo_class
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import StandardScaler
@@ -700,6 +702,29 @@ class Sampler:
         y_touched = [y_touch_dict[ri] for ri in sampled_idx]
         return X_touched, y_touched
 
+class predict(Transformer):
+
+    def __init__(self,model_config,project_settings):
+        super(predict, self).__init__(model_config, project_settings)
+        predict_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
+                        ['feature_engineering'])[0][self.manipulator_name]
+        base_algoritm = predict_entry['base_algorithm']
+        base_algo_class = get_algo_class(base_algoritm)
+        if not predict_entry.has_key('keyword_arg_settings'):
+            predict_entry['keyword_arg_settings'] = dict()
+        if not predict_entry.has_key('other_options'):
+            predict_entry['other_options'] = dict()
+        predict_entry['model_name'] = self.manipulator_name
+        self.set_base_transformer(Wrapper(base_algo_class, predict_entry,project_settings))
+        self.configure_ancestors_and_features()
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        new_col_name = self.manipulator_name + '_hat'
+        return [new_col_name]
+
+    def transform(self,X_touch,y_touch):
+        base_algo_instance = self.base_transformer
+        return pd.DataFrame(pd.Series(base_algo_instance.predict(X_touch),index=X_touch.index)), y_touch
 
 
 
