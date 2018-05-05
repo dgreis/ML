@@ -161,16 +161,16 @@ class Transformer(Manipulator):
         if inclusion_patterns == ['All']:
             touch_indices = range(len(prior_features))
             untouched_indices = list()
-        elif inclusion_patterns == ['All Numeric']:
-            project_settings = self.project_settings
-            if not project_settings.has_key('numeric_features'):
-                print "Must specify numeric features as numeric_features:[feature_name<1>, feature_name<2>..." \
-                      "in project_settings file "
-                raise Exception
-            else:
-                numeric_feature_names = project_settings['numeric_features']
-                touch_indices = [inv_working_features[n] for n in numeric_feature_names]
-                untouched_indices = list(set(col_indices).difference(set(touch_indices)))
+        # elif inclusion_patterns == ['All Numeric']:
+        #     project_settings = self.project_settings
+        #     if not project_settings.has_key('numeric_features'):
+        #         print "Must specify numeric features as numeric_features:[feature_name<1>, feature_name<2>..." \
+        #               "in project_settings file "
+        #         raise Exception
+        #     else:
+        #         numeric_feature_names = project_settings['numeric_features']
+        #         touch_indices = [inv_working_features[n] for n in numeric_feature_names]
+        #         untouched_indices = list(set(col_indices).difference(set(touch_indices)))
         else:
             for pattern in inclusion_patterns:
                 len_pat = len(pattern)
@@ -291,6 +291,11 @@ class interaction_terms(TransformChain):
         for tuple in compact_interactions:
             t0 = tuple[0]
             t1 = tuple[1]
+            # #TODO: Make this check work for categorical variables
+            # if False in [x in feature_names for x in (t0,t1)]:
+            #     print "Expected columns not present in data to do interaction. Check that they have not been transformed previously"
+            #     raise Exception
+            #     #TODO: move exception message inside Exception to be more informative.
             len_t0_str = len(t0)
             len_t1_str = len(t1)
             t0_col_vals = filter(lambda x: x[0:len_t0_str] == t0 , feature_names)
