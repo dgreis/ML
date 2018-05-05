@@ -153,23 +153,27 @@ class exclude_features(Filter):
         untouched_indices = list(set(col_indices).difference(set(touch_indices)))
         self._store_indices_and_features(untouched_indices,touch_indices)
 
-class inclusion_patterns(Filter):
+class include_features(Filter):
 
-    def __init__(self,model_config):
-        super(inclusion_patterns,self).__init__(model_config)
-        self.inclusion_patterns = self.fetch_filter_settings('inclusion_patterns')
+    def __init__(self,model_config, project_settings):
+        super(include_features, self).__init__(model_config, project_settings)
+        self.patterns = self.fetch_filter_settings('include_features')
 
-    def apply(self, X_mat, inv_column_map):
+    def fit(self, X_mat,y,**kwargs):
+        prior_manipulator_feature_names_filepath = self.prior_manipulator_feature_names_filepath
+        inv_column_map = load_inv_column_map(prior_manipulator_feature_names_filepath)
+        prior_features = flip_dict(inv_column_map)
+        col_names = prior_features.values()
+        col_indices = prior_features.keys()
         include_columns = list()
-        col_names = inv_column_map.keys()
-        inclusion_patterns = self.inclusion_patterns
+        inclusion_patterns = self.patterns['patterns']
         for pattern in inclusion_patterns:
             len_pat = len(pattern)
             pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
             include_columns = include_columns + pattern_begin_cols
-        include_indices = [int(inv_column_map[col_name]) for col_name in include_columns]
-        X_mat_filt = X_mat.loc[:,include_indices]
-        return X_mat_filt
+        untouched_indices = [int(inv_column_map[col_name]) for col_name in include_columns]
+        touch_indices = list(set(col_indices).difference(set(untouched_indices)))
+        self._store_indices_and_features(untouched_indices,touch_indices)
 
 class l1_based(Filter):
     """
