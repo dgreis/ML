@@ -163,17 +163,14 @@ class Transformer(Manipulator):
         if inclusion_patterns == ['All']:
             touch_indices = range(len(prior_features))
             untouched_indices = list()
-        # elif inclusion_patterns == ['All Numeric']:
-        #     project_settings = self.project_settings
-        #     if not project_settings.has_key('numeric_features'):
-        #         print "Must specify numeric features as numeric_features:[feature_name<1>, feature_name<2>..." \
-        #               "in project_settings file "
-        #         raise Exception
-        #     else:
-        #         numeric_feature_names = project_settings['numeric_features']
-        #         touch_indices = [inv_working_features[n] for n in numeric_feature_names]
-        #         untouched_indices = list(set(col_indices).difference(set(touch_indices)))
+            exclusion_flag = False
         else:
+            if type(inclusion_patterns) == dict:
+                assert inclusion_patterns.keys() == ['All But']
+                exclusion_flag = True
+                inclusion_patterns = inclusion_patterns['All But']
+            else:
+                exclusion_flag = False
             for pattern in inclusion_patterns:
                 len_pat = len(pattern)
                 pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
@@ -183,7 +180,10 @@ class Transformer(Manipulator):
             untouched_indices = list(set(col_indices).difference(set(touch_indices)))
             touch_indices = touch_indices
             untouched_indices = untouched_indices
-        return touch_indices, untouched_indices
+        if not exclusion_flag:
+            return touch_indices, untouched_indices
+        else:
+            return untouched_indices, touch_indices
 
     def transform(self, X_touch, y_touch, **kwargs):
         X_touched = self.base_transformer.transform(X_touch,**kwargs)
@@ -720,11 +720,15 @@ class predict(Transformer):
 
     def gen_new_column_names(self, touch_indices, prior_features):
         new_col_name = self.manipulator_name + '_hat'
-        return [new_col_name]
+        feature_names = [prior_features[i] for i in touch_indices]
+        return feature_names + [new_col_name]
 
     def transform(self,X_touch,y_touch):
         base_algo_instance = self.base_transformer
-        return pd.DataFrame(pd.Series(base_algo_instance.predict(X_touch),index=X_touch.index)), y_touch
+        col_loc = X_touch.shape[1]
+        X_touch.loc[:,col_loc] = base_algo_instance.predict(X_touch)
+        assert X_touch.shape[1] > col_loc
+        return X_touch, y_touch
 
 
 
