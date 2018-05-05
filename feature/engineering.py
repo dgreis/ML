@@ -68,14 +68,14 @@ class TransformChain(ManipulatorChain):
                 transformer = d[transformer_name]['initialized_transformer']
                 X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y)
                 if fit_transform:
-                    transformer.fit(X_touch,y_touch)
-                X_touched, y_touched = transformer.transform(X_touch,y_touch)
-                #fit_transform_args = self._get_args(transform_class, 'fit_transform')
-                #additional_args = filter(lambda x: x not in ['X_touch','working_features'], fit_transform_args)
-                #kwargs = dict()
-                #for arg in additional_args:
-                #    kwargs[arg] = getattr(self, arg)
-                #X_touched, new_feat_names = transformer.fit_transform(X_touch, working_features,**kwargs)
+                    transformer.fit(X_touch, y_touch)
+                transformer_class = transformer.__class__
+                transform_args = self._get_args(transformer_class, 'transform')
+                additional_args = filter(lambda x: x not in ['X_touch','y_touch'], transform_args)
+                kwargs = dict()
+                for arg in additional_args:
+                   kwargs[arg] = eval(arg)
+                X_touched, y_touched = transformer.transform(X_touch, y_touch,**kwargs)
                 X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched)
                 assert True not in pd.isnull(X_transform).any(1).value_counts() #TODO: pandas dependent
                 if dataset_name == "train":
@@ -148,7 +148,7 @@ class Transformer(Manipulator):
         self.base_transformer = transformer_instance
 
     def fit(self,X_touch,y_touch,**kwargs):
-        self.base_transformer.fit(X_touch,y_touch,**kwargs)
+        self.base_transformer.fit(X_touch, y_touch)
 
     def determine_split_indices(self, prior_features):
         #TODO: Better name this fn?
@@ -413,11 +413,15 @@ class loo_encoding(Transformer):
     def __init__(self, model_config, project_settings):
         super(loo_encoding, self).__init__(model_config, project_settings )
         self.set_base_transformer(LeaveOneOutEncoder(**self.kwargs))
+        self.configure_ancestors_and_features()
 
-    def fit_transform(self, X_touch, working_features,y):
-        kwargs = dict()
-        kwargs['y'] = y
-        return super(loo_encoding, self).fit_transform(X_touch,working_features,**kwargs)
+    # def fit_transform(self, X_touch, working_features,y):
+    #     kwargs = dict()
+    #     kwargs['y'] = y
+    #     return super(loo_encoding, self).fit_transform(X_touch,working_features,**kwargs)
+
+    def transform(self, X_touch, y_touch, dataset_name):
+        return self.base_transformer.transform(X_touch,y_touch, dataset_name)
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         inclusion_patterns = self.inclusion_patterns
@@ -432,18 +436,41 @@ class LeaveOneOutEncoder:
     def __init__(self):
         pass
 
-    def fit_transform(self,X_mat, working_features, y):
-        loo_vals = list()
-        for j in X_mat.columns:
-            j_idx = X_mat[X_mat.loc[:,j] > 0].index
-            yj = [y[ji] for ji in j_idx]
-            cat_sum = sum(yj)
-            cat_len = len(yj)
+    def fit(self, X_touch, y_touch):
+        loo_vals = dict()
+        mean_val_dict = dict()
+        y_ser = pd.Series(y_touch,index=X_touch.index)
+        for j in X_touch.columns:
+            j_idx = X_touch[X_touch.loc[:, j] > 0].index  #take all rows that belong to category j
+            yj_dict = dict(y_ser.loc[j_idx])
+            cat_sum = sum(yj_dict.values())
+            cat_len = len(yj_dict)
+            if cat_len > 0:
+                mean_val_dict[j] = cat_sum / cat_len
+            else:
+                mean_val_dict[j] = y_ser.mean()
             for i in j_idx:
-                y_loo_mean = (cat_sum-y[i]) / (cat_len - 1)
-                loo_vals.append(y_loo_mean)
-        assert len(loo_vals) == len(X_mat)
-        return pd.DataFrame(pd.Series(loo_vals))
+                if cat_len > 1:
+                    y_loo_catmean = (cat_sum - yj_dict[i]) / (cat_len - 1)    #for each row in j_idx, calc mean w/o row value
+                else:
+                    y_loo_catmean = (y_ser.sum() - yj_dict[i]) / (len(y_ser) - 1)
+                loo_vals[i] = y_loo_catmean
+        self.loo_means = pd.Series(loo_vals)
+        self.mean_val_dict = mean_val_dict
+
+    def transform(self, X_touch, y_touch, dataset_name):
+        if dataset_name == 'train':
+            loo_means = self.loo_means
+            assert len(loo_means) == len(X_touch)
+            assert not pd.isnull(loo_means).any()
+            return pd.DataFrame(self.loo_means), y_touch
+        else:
+            assert len(self.mean_val_dict) == X_touch.shape[1]
+            mean_val_dict = self.mean_val_dict
+            cat_means = X_touch.idxmax(1).apply(lambda x: mean_val_dict[x])
+            assert not pd.isnull(cat_means).any()
+            return pd.DataFrame(cat_means,index=X_touch.index), y_touch
+
 
 class interpolate(Transformer):
     """Example in models.yaml file:
@@ -459,7 +486,7 @@ class interpolate(Transformer):
                     interp1d: {}
     """
     def __init__(self, model_config, project_settings):
-        super(interpolate_ind_col, self).__init__(model_config, project_settings)
+        super(interpolate, self).__init__(model_config, project_settings)
         self.set_base_transformer(None)
         self.configure_ancestors_and_features()
 
@@ -473,8 +500,8 @@ class interpolate(Transformer):
         fitted_lowess = lowess(X_mat.iloc[:,0], np.array(y),**lowess_kwargs)
 
         # unpack the lowess smoothed points to their values
-        lowess_x = list(zip(*fitted_lowess))[0]
-        lowess_y = list(zip(*fitted_lowess))[1]
+        lowess_y = list(zip(*fitted_lowess))[0]
+        lowess_x = list(zip(*fitted_lowess))[1]
 
         # run scipy's interpolation. There is also extrapolation I believe
         f = Interpolator(lowess_x, lowess_y,bounds_error=False,**interp1d_kwargs)
@@ -491,7 +518,7 @@ class interpolate(Transformer):
 class Interpolator(interp1d):
 
     def __init__(self,x,y,**kwargs):
-        super(Interpolator,self).__init__(x,y,**kwargs)
+        super(Interpolator,self).__init__(x,y,fill_value='extrapolate',**kwargs)
 
     def transform(self,x):
         return self(x)
@@ -635,7 +662,7 @@ class sample(Transformer):
 
     def transform(self,X_touch,y_touch,dataset_name):
         if dataset_name == "train":
-            X_touched, y_touched =  self.base_transformer.transform(X_touch,y_touch)
+            X_touched, y_touched = self.base_transformer.transform(X_touch, y_touch)
             return X_touched, y_touched
         else:
             return X_touch, y_touch
