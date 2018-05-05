@@ -276,14 +276,14 @@ class interaction_terms(TransformChain):
         compact_interactions = [eval(ris) for ris in raw_interaction_strs]
         expanded_transformations = list()
         transformer_names = [d.keys()[0] for d in transformations]
-        t_order = transformer_names.index('interaction_terms')
-        if t_order == 0:
+        t_idx = transformer_names.index('interaction_terms')
+        if t_idx == 0:
             if model_config['feature_settings']['select_before_eng']:
                 print "Interaction terms are meant to be run before model selection methods. Turn off select_before_eng flag"
                 raise Exception
             prior_transform_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
         else:
-            prior_transform = transformer_names[t_order - 1]
+            prior_transform = transformer_names[t_idx - 1]
             prior_transform_feature_names_filepath = self._det_output_features_filepath(prior_transform)
         inv_column_map = load_inv_column_map(prior_transform_feature_names_filepath)
         feature_names = inv_column_map.keys()
@@ -309,15 +309,12 @@ class interaction_terms(TransformChain):
                 }
                 expanded_transformations.append(transformation_dict)
                 i += 1
-        transformation_names = [t.keys()[0] for t in transformations]
-        int_idx = transformation_names.index('interaction_terms')
-        if int_idx == 0:
+        if t_idx == 0:
             transformations = expanded_transformations + transformations[1:]
             exp_idx = len(expanded_transformations)
-        elif int_idx < len(transformations) - 1:
-            transformations = transformations[0:int_idx] + expanded_transformations +transformations[int_idx+1:]
-            #TODO: implement exp_idx
-            raise NotImplementedError
+        elif t_idx < len(transformations) - 1:
+            transformations = transformations[0:t_idx] + expanded_transformations + transformations[t_idx + 1:]
+            exp_idx = len(transformations[0:t_idx]) + len(expanded_transformations)
         else:
             transformations = transformations[:-1] + expanded_transformations
             exp_idx = len(transformations[:-1]) + len(expanded_transformations)
