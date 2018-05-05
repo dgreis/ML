@@ -1,4 +1,5 @@
 import importlib
+import numpy as np
 
 def load_evaluation_battery(project_settings):
     ml_problem_type = project_settings['ml_problem_type']
@@ -25,5 +26,20 @@ def load_evaluation_battery(project_settings):
     return battery
 
 def load_metric_class(metric_name):
-    sklearn_metric_module = importlib.import_module('sklearn.metrics')
-    return getattr(sklearn_metric_module,metric_name)
+    if metric_name != "rmsle":
+        sklearn_metric_module = importlib.import_module('sklearn.metrics')
+        return getattr(sklearn_metric_module,metric_name)
+    else:
+        this_module = importlib.import_module('evaluation')
+        return getattr(this_module,metric_name)
+
+
+def rmsle(real, predicted):
+    sum=0.0
+    for x in range(len(predicted)):
+        if predicted[x]<0 or real[x]<0: #check for negative values
+            continue
+        p = np.log(predicted[x]+1)
+        r = np.log(real[x]+1)
+        sum = sum + (p - r)**2
+    return (sum/len(predicted))**0.5

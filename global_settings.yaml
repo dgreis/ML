@@ -29,6 +29,9 @@ metrics:
         r2_score:
           metric_type: column
           kwargs: {}
+        rmsle:
+          metric_type: column
+          kwargs: {}
   binary-classification:
       battery:
         precision_recall_curve:
