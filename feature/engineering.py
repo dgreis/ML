@@ -537,6 +537,8 @@ class as_numeric(TransformChain):
            - as_numeric
                inclusion_patterns
                  - <pattern>
+               val_maps:
+                 - <pattern> : { str:val, str:val,...}
     """
 
     def __init__(self,transformations, model_config, project_settings,original_columns):
@@ -545,24 +547,23 @@ class as_numeric(TransformChain):
         expanded_transformations = list()
         transformer_names = [d.keys()[0] for d in transformations]
         t_idx = transformer_names.index('as_numeric')
-        # if t_idx == 0:
-        #     if model_config['feature_settings']['select_before_eng']:
-        #         print "Interaction terms are meant to be run before model selection methods. Turn off select_before_eng flag"
-        #         raise Exception
-        #     prior_transform_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-        # else:
-        #     prior_transform = transformer_names[t_idx - 1]
-        #     prior_transform_feature_names_filepath = self._det_output_features_filepath(prior_transform)
-        # inv_column_map = load_inv_column_map(prior_transform_feature_names_filepath)
         i = 0
-        inclusion_patterns = filter(lambda x: x.keys()[0] == 'as_numeric', transformations)[0]['as_numeric']['inclusion_patterns']
+        as_numeric_entry = filter(lambda x: x.keys()[0] == 'as_numeric', transformations)[0]['as_numeric']
+        inclusion_patterns = as_numeric_entry['inclusion_patterns']
+        if as_numeric_entry.has_key('val_maps'):
+            val_maps = as_numeric_entry['val_maps']
+        else:
+            val_maps = dict()
         for pattern in inclusion_patterns:
-                transformation_dict = dict()
-                transformation_dict['_' + str(i) + '.' + 'ind_as_numeric'] = {
-                    'inclusion_patterns': [pattern],
-                }
-                expanded_transformations.append(transformation_dict)
-                i += 1
+            transformation_dict = dict()
+            expanded_transformer_name = '_' + str(i) + '.' + 'ind_as_numeric'
+            transformation_dict[expanded_transformer_name] = {
+                'inclusion_patterns': [pattern],
+            }
+            expanded_transformations.append(transformation_dict)
+            i += 1
+            if val_maps.has_key(pattern):
+                transformation_dict[expanded_transformer_name]['val_map'] = val_maps[pattern]
         if t_idx == 0:
             transformations = expanded_transformations + transformations[1:]
             exp_idx = len(expanded_transformations)
@@ -582,7 +583,12 @@ class ind_as_numeric(Transformer):
     def __init__(self,model_config, project_settings):
         super(ind_as_numeric, self).__init__(model_config, project_settings)
         self.configure_ancestors_and_features()
-        self.set_base_transformer(InvOneHotEncoder(self.touch_indices, self.prior_features))
+        ind_as_numeric_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
+                        ['feature_engineering'])[0][self.manipulator_name]
+        kwargs = dict()
+        if ind_as_numeric_entry.has_key('val_map'):
+            kwargs['val_map'] = ind_as_numeric_entry['val_map']
+        self.set_base_transformer(InvOneHotEncoder(self.touch_indices, self.prior_features,**kwargs))
 
 
     def gen_new_column_names(self, touch_indices, prior_features):
@@ -592,30 +598,58 @@ class ind_as_numeric(Transformer):
         base_name = 'as_numeric(' + base_names[0] + ')'
         return [base_name]
 
+    def transform(self, X_touch, y_touch, dataset_name):
+        return self.base_transformer.transform(X_touch,y_touch,dataset_name)
+
 class InvOneHotEncoder:
 
-    def __init__(self,touch_indices, prior_features):
+    def __init__(self,touch_indices, prior_features,val_map=None):
         self.prior_features = prior_features
         self.touch_indices = touch_indices
+
+        if val_map is not None:
+            self.val_map = val_map
 
         idx_val_map = dict()
 
         for ti in touch_indices:
             prior_feature_col = prior_features[ti]
-            value = float(prior_feature_col.split('_')[1])
+            value = prior_feature_col.split('_')[1]
             idx_val_map[ti] = value
+            if val_map is not None:
+                try:
+                    assert value in val_map.keys()
+                except AssertionError:
+                    print value + " is not in val_map for feature " + prior_feature_col.split('_')[0]
+                    raise Exception
+                idx_val_map[ti] = float(val_map[value])
+            else:
+                try:
+                    idx_val_map[ti] = float(idx_val_map[ti])
+                except ValueError:
+                    print "Specify a val_map for feature " + prior_feature_col.split('_')[0]
+                    raise Exception
+                    #TODO: include this in Exception message
 
         self.idx_val_map = idx_val_map
 
     def fit(self,X,y):
         pass
 
-    def transform(self,X_touch):
+    def transform(self,X_touch,y_touch,dataset_name):
         #Pandas dependent
         max_col = X_touch.idxmax(1)
         idx_val_map = self.idx_val_map
         num_column = max_col.apply(lambda x: idx_val_map[x])
-        return num_column
+        if hasattr(self,'val_map'):
+            val_map = self.val_map
+            inv_val_map = flip_dict(val_map)
+            for val in inv_val_map:
+                try:
+                    assert val in num_column.values
+                except AssertionError:
+                    print '\t' + str(val) + " not in column for dataset:" + dataset_name + ". Possibly Tweak val_map in as_numeric transform"
+        return pd.DataFrame(num_column,index=X_touch.index), y_touch
 
 class sample(Transformer):
     """Example in models.yaml file:
