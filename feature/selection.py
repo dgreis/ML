@@ -121,59 +121,6 @@ class Filter(Manipulator):
                 prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings,'feature_names')
         return prior_manipulator_feature_names_filepath
 
-class exclude_features(Filter):
-    """
-    Example yaml usage:
-
-    Models:
-      <model name>:
-        feature_settings:
-          feature_selection:
-            - exclude_features:
-                patterns:
-                  - <matching pattern>
-    """
-    def __init__(self, model_config, project_settings):
-        super(exclude_features, self).__init__(model_config, project_settings)
-        self.patterns = self.fetch_filter_settings('exclude_features')
-
-    def fit(self,X_mat,y,**kwargs):
-        prior_manipulator_feature_names_filepath = self.prior_manipulator_feature_names_filepath
-        inv_column_map = load_inv_column_map(prior_manipulator_feature_names_filepath)
-        prior_features = flip_dict(inv_column_map)
-        col_names = prior_features.values()
-        col_indices = prior_features.keys()
-        exclude_columns = list()
-        exclusion_patterns = self.patterns['patterns']
-        for pattern in exclusion_patterns:
-            len_pat = len(pattern)
-            pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
-            exclude_columns = exclude_columns + pattern_begin_cols
-        touch_indices = [int(inv_column_map[col_name]) for col_name in exclude_columns]
-        untouched_indices = list(set(col_indices).difference(set(touch_indices)))
-        self._store_indices_and_features(untouched_indices,touch_indices)
-
-class include_features(Filter):
-
-    def __init__(self,model_config, project_settings):
-        super(include_features, self).__init__(model_config, project_settings)
-        self.patterns = self.fetch_filter_settings('include_features')
-
-    def fit(self, X_mat,y,**kwargs):
-        prior_manipulator_feature_names_filepath = self.prior_manipulator_feature_names_filepath
-        inv_column_map = load_inv_column_map(prior_manipulator_feature_names_filepath)
-        prior_features = flip_dict(inv_column_map)
-        col_names = prior_features.values()
-        col_indices = prior_features.keys()
-        include_columns = list()
-        inclusion_patterns = self.patterns['patterns']
-        for pattern in inclusion_patterns:
-            len_pat = len(pattern)
-            pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
-            include_columns = include_columns + pattern_begin_cols
-        untouched_indices = [int(inv_column_map[col_name]) for col_name in include_columns]
-        touch_indices = list(set(col_indices).difference(set(untouched_indices)))
-        self._store_indices_and_features(untouched_indices,touch_indices)
 
 class l1_based(Filter):
     """

@@ -125,12 +125,12 @@ class Transformer(Manipulator):
                 prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings,'feature_names')
         return prior_manipulator_feature_names_filepath
 
-    def configure_ancestors_and_features(self):
+    def configure_ancestors_and_features(self,exclusion_flag=False):
         prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
         prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
         prior_features = flip_dict(prior_inv_col_map)
         self.prior_features = prior_features
-        touch_indices, untouched_indices = self.determine_split_indices(prior_features)
+        touch_indices, untouched_indices = self.det_split_indices(prior_features,exclusion_flag)
         new_features = self.gen_new_column_names(touch_indices, prior_features)
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
@@ -153,7 +153,7 @@ class Transformer(Manipulator):
     def fit(self,X_touch,y_touch,**kwargs):
         self.base_transformer.fit(X_touch, y_touch)
 
-    def determine_split_indices(self, prior_features):
+    def det_split_indices(self, prior_features,exclusion_flag):
         #TODO: Better name this fn?
         assert getattr(self, 'inclusion_patterns') != None
         include_columns = list()
@@ -164,14 +164,11 @@ class Transformer(Manipulator):
         if inclusion_patterns == ['All']:
             touch_indices = range(len(prior_features))
             untouched_indices = list()
-            exclusion_flag = False
         else:
             if type(inclusion_patterns) == dict:
                 assert inclusion_patterns.keys() == ['All But']
                 exclusion_flag = True
                 inclusion_patterns = inclusion_patterns['All But']
-            else:
-                exclusion_flag = False
             for pattern in inclusion_patterns:
                 len_pat = len(pattern)
                 pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
@@ -770,7 +767,7 @@ class reset_data(Transformer):
 
     def __init__(self,model_config,project_settings):
         super(reset_data, self).__init__(model_config, project_settings )
-        self.set_base_transformer(Resetter(**self.kwargs))
+        self.set_base_transformer(Identity(**self.kwargs))
         self.configure_ancestors_and_features()
 
     def gen_new_column_names(self, touch_indices, prior_features):
@@ -782,18 +779,42 @@ class reset_data(Transformer):
     def transform(self,X_touch,y_touch,X_mat_start):
         return self.base_transformer.transform(X_mat_start), y_touch
 
-class Resetter:
+class exclude_features(Transformer):
+    """
+    Example yaml usage:
 
-    def __init__(self):
-        pass
+    Models:
+      <model name>:
+        feature_settings:
+          feature_selection:
+            - exclude_features:
+                inclusion_patterns:
+                  - <matching pattern>
+    """
+    def __init__(self, model_config, project_settings):
+        super(exclude_features, self).__init__(model_config, project_settings)
+        self.configure_ancestors_and_features()
+        self.set_base_transformer(Deleter(**self.kwargs))
 
-    def fit(self,X_touch,y_touch):
-        pass
+    def gen_new_column_names(self, touch_indices, prior_features):
+        return list()
 
-    def transform(self,X_mat_start):
-        return X_mat_start
+class include_features(Transformer):
+    """
+    Example yaml usage:
 
+    Models:
+      <model name>:
+        feature_settings:
+          feature_selection:
+            - include_features:
+                inclusion_patterns:
+                  - <matching pattern>
+    """
+    def __init__(self, model_config, project_settings):
+        super(include_features, self).__init__(model_config, project_settings)
+        self.configure_ancestors_and_features()
+        self.set_base_transformer(Deleter(**self.kwargs))
 
-
-
-
+    def gen_new_column_names(self, touch_indices, prior_features):
+        return list()
