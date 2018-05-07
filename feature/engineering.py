@@ -56,17 +56,29 @@ class TransformChain(ManipulatorChain):
             for d in transformations:
                 transformer_name = d.keys()[0]
                 transformer = d[transformer_name]['initialized_transformer']
-                X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y)
-                if fit_transform:
-                    transformer.fit(X_touch, y_touch)
                 transformer_class = transformer.__class__
+                if fit_transform:
+                    touch_cols = transformer.touch_indices
+                    X_rel = X_mat.loc[:,touch_cols]
+                    transformer.fit(X_rel, y)
+                split_args = self._get_args(transformer_class, 'split')
+                additional_args = filter(lambda x: x not in ['X_mat','y'], split_args)
+                spkwargs = dict()
+                for arg in additional_args:
+                    spkwargs[arg] = eval(arg)
+                X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y,**spkwargs)
                 transform_args = self._get_args(transformer_class, 'transform')
                 additional_args = filter(lambda x: x not in ['X_touch','y_touch'], transform_args)
-                kwargs = dict()
+                tfkwargs = dict()
                 for arg in additional_args:
-                   kwargs[arg] = eval(arg)
-                X_touched, y_touched = transformer.transform(X_touch, y_touch,**kwargs)
-                X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched)
+                   tfkwargs[arg] = eval(arg)
+                X_touched, y_touched = transformer.transform(X_touch, y_touch,**tfkwargs)
+                combine_args = self._get_args(transformer_class, 'combine')
+                additional_args = filter(lambda x: x not in ['X_touched','X_untouched','y_touched','y_untouched'],combine_args)
+                cmkwargs = dict()
+                for arg in additional_args:
+                    cmkwargs[arg] = eval(arg)
+                X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched,**cmkwargs) #TODO: clean up this kwarg loading mess
                 assert True not in pd.isnull(X_transform).any(1).value_counts() #TODO: pandas dependent
                 if dataset_name == "train":
                     if transformer.store:
@@ -112,18 +124,22 @@ class Transformer(Manipulator):
                 prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings,'feature_names')
         return prior_manipulator_feature_names_filepath
 
-    def configure_ancestors_and_features(self,exclusion_flag=False):
-        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
-        prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
-        prior_features = flip_dict(prior_inv_col_map)
-        self.prior_features = prior_features
-        touch_indices, untouched_indices = self.det_split_indices(prior_features,exclusion_flag)
-        new_features = self.gen_new_column_names(touch_indices, prior_features)
-        self.touch_indices = touch_indices
-        self.untouched_indices = untouched_indices
+    def configure_features(self):
+        prior_features = self.load_prior_features()
+        touch_cols, untouched_cols = self.det_relevant_cols(prior_features)
+        self.touch_indices = touch_cols
+        self.untouched_indices = untouched_cols
+        touch_cols = self.touch_indices
+        new_features = self.gen_new_column_names(touch_cols, prior_features)
         new_feature_set = self.reindex(prior_features, new_features)
         self.features = new_feature_set
         self.output_features()
+
+    def load_prior_features(self):
+        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
+        prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
+        prior_features = flip_dict(prior_inv_col_map)
+        return prior_features
 
     def fetch_transform_settings(self,model_config, transformer_name):
         feature_eng_settings = model_config['feature_settings']['feature_engineering']
@@ -137,12 +153,13 @@ class Transformer(Manipulator):
     def set_base_transformer(self,transformer_instance):
         self.base_transformer = transformer_instance
 
-    def fit(self,X_touch,y_touch,**kwargs):
-        self.base_transformer.fit(X_touch, y_touch)
+    def fit(self, X_mat, y, **kwargs):
+        self.base_transformer.fit(X_mat, y)
 
-    def det_split_indices(self, prior_features,exclusion_flag):
-        #TODO: Better name this fn?
+    def det_relevant_cols(self, prior_features, exclusion_flag=False):
         assert getattr(self, 'inclusion_patterns') != None
+        if hasattr(self,'exclusion_flag'):
+            exclusion_flag = getattr(self,'exclusion_flag')
         include_columns = list()
         col_indices = prior_features.keys()
         col_names = prior_features.values()
@@ -165,13 +182,14 @@ class Transformer(Manipulator):
             untouched_indices = list(set(col_indices).difference(set(touch_indices)))
             touch_indices = touch_indices
             untouched_indices = untouched_indices
-        if not exclusion_flag:
-            return touch_indices, untouched_indices
-        else:
-            return untouched_indices, touch_indices
+        if exclusion_flag:
+            touch_indices = untouched_indices
+            untouched_indices = touch_indices
+        return touch_indices, untouched_indices
 
     def transform(self, X_touch, y_touch, **kwargs):
-        X_touched = self.base_transformer.transform(X_touch,**kwargs)
+        """Transform Wrapper for Default (i.e. Vertical) Transformers"""
+        X_touched = self.base_transformer.transform(X_touch, **kwargs)
         if type(X_touched) != pd.core.frame.DataFrame: #TODO: fix this when I move out of pandas
             rdf = pd.DataFrame(X_touched,index=X_touch.index)
         else:
@@ -199,6 +217,41 @@ class Transformer(Manipulator):
         output_file_name = slugify(model_name + '-' + transform_name)
         X_mat.to_csv(output_dir + '/' + output_file_name + '.txt', header=False, index=False, sep='\t')  # TODO: fix this when I move out of pandas
 
+class HorizontalTransformer(Transformer):
+
+    def __init__(self, model_config, project_settings):
+        super(HorizontalTransformer,self).__init__(model_config, project_settings)
+
+    def split(self, X_mat, y,dataset_name):
+        """This is a horizontal splitting method"""
+        if dataset_name == "train":
+            X_mat_idx = X_mat.index.tolist()
+            untouched_indices = self.untouched_indices
+            touch_indices = self.touch_indices
+            X_untouched = X_mat.loc[untouched_indices,:]
+            y_untouched = pd.Series(y, index=X_mat_idx).loc[untouched_indices].tolist()
+            X_touch = X_mat.loc[touch_indices,:]
+            y_touch = pd.Series(y, index=X_mat_idx).loc[touch_indices].tolist()
+            return X_touch, X_untouched, y_touch, y_untouched
+        else:
+            return None, X_mat, None, y
+
+
+    def transform(self,X_touch,y_touch,dataset_name):
+        if dataset_name == "train":
+            X_touched, y_touched = self.base_transformer.transform(X_touch, y_touch)
+            return X_touched, y_touched
+        else:
+            return X_touch, y_touch
+
+    def combine(self,X_touched,X_untouched,y_touched,y_untouched,dataset_name):
+        "This is a vertical combine instead of the default horizontal"
+        if dataset_name == "train":
+            X_transform = X_untouched.append(X_touched,ignore_index=True)
+            y_transform = y_touched + y_untouched
+            return X_transform, y_transform
+        else:
+            return X_untouched, y_untouched
 
 class basis_expansion(Transformer):
     """
@@ -219,7 +272,7 @@ class basis_expansion(Transformer):
     def __init__(self, model_config, project_settings):
         super(basis_expansion, self).__init__(model_config, project_settings)
         self.set_base_transformer(PolynomialFeatures(**self.kwargs))
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         tuples = list()
@@ -325,7 +378,7 @@ class normalize(Transformer):
     def __init__(self, model_config, project_settings):
         super(normalize, self).__init__(model_config, project_settings )
         self.set_base_transformer(Normalizer(**self.kwargs))
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         Xt_feat_names = list()
@@ -353,7 +406,7 @@ class standard_scale(Transformer):
     def __init__(self, model_config, project_settings):
         super(standard_scale, self).__init__(model_config, project_settings )
         self.set_base_transformer(StandardScaler(**self.kwargs))
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         Xt_feat_names = list()
@@ -379,7 +432,7 @@ class pca(Transformer):
     def __init__(self, model_config, project_settings):
         super(pca, self).__init__(model_config, project_settings )
         self.set_base_transformer(PCA(**self.kwargs))
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         num_comps = self.base_transformer.n_components
@@ -402,15 +455,10 @@ class loo_encoding(Transformer):
     def __init__(self, model_config, project_settings):
         super(loo_encoding, self).__init__(model_config, project_settings )
         self.set_base_transformer(LeaveOneOutEncoder(**self.kwargs))
-        self.configure_ancestors_and_features()
-
-    # def fit_transform(self, X_touch, working_features,y):
-    #     kwargs = dict()
-    #     kwargs['y'] = y
-    #     return super(loo_encoding, self).fit_transform(X_touch,working_features,**kwargs)
+        self.configure_features()
 
     def transform(self, X_touch, y_touch, dataset_name):
-        return self.base_transformer.transform(X_touch,y_touch, dataset_name)
+        return self.base_transformer.transform(X_touch, dataset_name), y_touch
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         inclusion_patterns = self.inclusion_patterns
@@ -436,16 +484,16 @@ class interpolate(Transformer):
     def __init__(self, model_config, project_settings):
         super(interpolate, self).__init__(model_config, project_settings)
         self.set_base_transformer(None)
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
-    def fit(self,X_mat,y):
+    def fit(self, X_mat, y):
         kwargs = self.kwargs
         lowess_kwargs = kwargs['lowess']
         interp1d_kwargs = kwargs['interp1d']
 
         assert X_mat.shape[1] == 1 #For now, just one feature per transformer
 
-        fitted_lowess = lowess(X_mat.iloc[:,0], np.array(y),**lowess_kwargs)
+        fitted_lowess = lowess(X_mat.iloc[:, 0], np.array(y), **lowess_kwargs)
 
         # unpack the lowess smoothed points to their values
         lowess_y = list(zip(*fitted_lowess))[0]
@@ -518,7 +566,7 @@ class ind_as_numeric(Transformer):
     """
     def __init__(self,model_config, project_settings):
         super(ind_as_numeric, self).__init__(model_config, project_settings)
-        self.configure_ancestors_and_features()
+        self.configure_features()
         ind_as_numeric_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
                         ['feature_engineering'])[0][self.manipulator_name]
         kwargs = dict()
@@ -537,8 +585,7 @@ class ind_as_numeric(Transformer):
     def transform(self, X_touch, y_touch, dataset_name):
         return self.base_transformer.transform(X_touch,y_touch,dataset_name)
 
-
-class sample(Transformer):
+class sample(HorizontalTransformer):
     """Example in models.yaml file:
         Models:
           <Model Name>:
@@ -553,11 +600,11 @@ class sample(Transformer):
     def __init__(self,model_config,project_settings):
         super(sample, self).__init__(model_config, project_settings )
         self.set_base_transformer(Sampler(**self.kwargs))
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
-    def fit(self,X_mat,y_mat):
+    def fit(self, X_mat, y):
         X_mat_idx = X_mat.index.tolist()
-        y = pd.Series(y_mat,index=X_mat_idx)
+        y = pd.Series(y, index=X_mat_idx)
         min_idx = y[y == 1].index.tolist()
         maj_idx = y[y == 0].index.tolist()
         upsample = getattr(self.base_transformer,'upsample_flag')
@@ -571,36 +618,6 @@ class sample(Transformer):
         self.untouched_indices = untouched_indices
         setattr(self.base_transformer,'touch_indices', touch_indices)
         setattr(self.base_transformer,'untouched_indices', untouched_indices)
-
-    def split(self, X_mat, y, dataset_name):
-        """This is a horizontal splitting method"""
-        if dataset_name == "train":
-            X_mat_idx = X_mat.index.tolist()
-            untouched_indices = self.untouched_indices
-            touch_indices = self.touch_indices
-            X_untouched = X_mat.loc[untouched_indices,:]
-            y_untouched = pd.Series(y,index=X_mat_idx).loc[untouched_indices].tolist()
-            X_touch = X_mat.loc[touch_indices,:]
-            y_touch = pd.Series(y,index=X_mat_idx).loc[touch_indices].tolist()
-            return X_touch, X_untouched, y_touch, y_untouched
-        else:
-            return None, X_mat, None, y
-
-    def transform(self,X_touch,y_touch,dataset_name):
-        if dataset_name == "train":
-            X_touched, y_touched = self.base_transformer.transform(X_touch, y_touch)
-            return X_touched, y_touched
-        else:
-            return X_touch, y_touch
-
-    def combine(self,X_touched,X_untouched,y_touched,y_untouched,dataset_name):
-        "This is a vertical combine instead of the default horizontal"
-        if dataset_name == "train":
-            X_transform = X_untouched.append(X_touched,ignore_index=True)
-            y_transform = y_touched + y_untouched
-            return X_transform, y_transform
-        else:
-            return X_untouched, y_untouched
 
     def gen_new_column_names(self, touch_indices, prior_features):
         return prior_features
@@ -620,7 +637,7 @@ class predict(Transformer):
             predict_entry['other_options'] = dict()
         predict_entry['model_name'] = self.manipulator_name
         self.set_base_transformer(Wrapper(base_algo_class, predict_entry,project_settings))
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
     def gen_new_column_names(self, touch_indices, prior_features):
         new_col_name = self.manipulator_name + '_hat'
@@ -640,7 +657,7 @@ class reset_data(Transformer):
     def __init__(self,model_config,project_settings):
         super(reset_data, self).__init__(model_config, project_settings )
         self.set_base_transformer(Identity(**self.kwargs))
-        self.configure_ancestors_and_features()
+        self.configure_features()
 
     def gen_new_column_names(self, touch_indices, prior_features):
         project_settings = self.project_settings
@@ -665,7 +682,7 @@ class exclude_features(Transformer):
     """
     def __init__(self, model_config, project_settings):
         super(exclude_features, self).__init__(model_config, project_settings)
-        self.configure_ancestors_and_features()
+        self.configure_features()
         self.set_base_transformer(Deleter(**self.kwargs))
 
     def gen_new_column_names(self, touch_indices, prior_features):
