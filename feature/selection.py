@@ -14,8 +14,8 @@ from sklearn.feature_selection import f_classif
 
 class FilterChain(ManipulatorChain):
 
-    def __init__(self,filters, model_config, project_settings,original_columns=False):
-        ManipulatorChain.__init__(self, filters, model_config, project_settings, original_columns)
+    def __init__(self,filters, model_config, project_settings):
+        ManipulatorChain.__init__(self, filters, model_config, project_settings)
         self.filters = filters
 
     def fit_transform(self,X_mat,y,dataset_name):

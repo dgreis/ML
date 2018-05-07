@@ -67,12 +67,12 @@ class Manipulator(object):
     def gen_new_column_names(self, touch_indices, prior_features):
         raise NotImplementedError
 
-    def split(self, X_mat, y_mat):
+    def split(self, X_mat, y):
         untouched_indices = self.untouched_indices
         touch_indices = self.touch_indices
         X_untouched = X_mat.loc[:,untouched_indices]
         X_touch = X_mat.loc[:,touch_indices]
-        return X_touch, X_untouched, y_mat, None
+        return X_touch, X_untouched, y, None
 
     def reindex(self, prior_features, new_features=list()):
         untouched_indices = self.untouched_indices
@@ -93,7 +93,7 @@ class Manipulator(object):
 
 class ManipulatorChain(Manipulator):
 
-    def __init__(self, manipulations, model_config, project_settings,original_columns):
+    def __init__(self, manipulations, model_config, project_settings):
         super(ManipulatorChain, self).__init__(model_config,project_settings, manipulations)
 
     def fit(self,X_mat,y):

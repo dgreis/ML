@@ -22,7 +22,7 @@ from django.utils.text import slugify
 
 class TransformChain(ManipulatorChain):
 
-    def __init__(self,starting_transformations, model_config, project_settings,original_columns=False):
+    def __init__(self, starting_transformations, model_config, project_settings):
         updated_transformations = list()
         model_config['feature_settings']['order'] = 0
         engineering_module = importlib.import_module('feature.engineering')
@@ -33,7 +33,7 @@ class TransformChain(ManipulatorChain):
             if transform_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
                 transform_chain_class = transform_class
                 working_transformations = model_config['feature_settings']['feature_engineering']
-                tc = transform_chain_class(working_transformations,model_config,project_settings,original_columns)
+                tc = transform_chain_class(working_transformations,model_config,project_settings)
                 updated_transformations = tc.transformations
             else:
                 transformer_name = transformation.keys()[0]
@@ -43,7 +43,7 @@ class TransformChain(ManipulatorChain):
                 model_config['feature_settings']['order'] += 1
                 transformation[transformer_name]['initialized_transformer'] = transformer
                 updated_transformations = updated_transformations + [transformation]
-        super(TransformChain,self).__init__(updated_transformations, model_config, project_settings,original_columns)
+        super(TransformChain,self).__init__(updated_transformations, model_config, project_settings)
         self.transformations = updated_transformations
 
     def transform(self,X_mat,y,dataset_name,fit_transform=False):
@@ -84,7 +84,7 @@ class TransformChain(ManipulatorChain):
                     if transformer.store:
                         artifact_dir = self.artifact_dir
                         transformer.store_output(X_transform,output_dir=artifact_dir)
-                X_mat, y_mat = X_transform, y_transform
+                X_mat, y = X_transform, y_transform
                 i += 1
         return X_transform, y_transform
 
@@ -180,12 +180,10 @@ class Transformer(Manipulator):
             non_inter_include_columns = filter(lambda x: 'x%x' not in x, include_columns)
             touch_indices = [int(inv_working_features[col_name]) for col_name in non_inter_include_columns]
             untouched_indices = list(set(col_indices).difference(set(touch_indices)))
-            touch_indices = touch_indices
-            untouched_indices = untouched_indices
         if exclusion_flag:
-            touch_indices = untouched_indices
-            untouched_indices = touch_indices
-        return touch_indices, untouched_indices
+            return untouched_indices, touch_indices
+        else:
+            return touch_indices, untouched_indices
 
     def transform(self, X_touch, y_touch, **kwargs):
         """Transform Wrapper for Default (i.e. Vertical) Transformers"""
@@ -222,7 +220,7 @@ class HorizontalTransformer(Transformer):
     def __init__(self, model_config, project_settings):
         super(HorizontalTransformer,self).__init__(model_config, project_settings)
 
-    def split(self, X_mat, y,dataset_name):
+    def split(self, X_mat, y, dataset_name):
         """This is a horizontal splitting method"""
         if dataset_name == "train":
             X_mat_idx = X_mat.index.tolist()
@@ -310,7 +308,7 @@ class interaction_terms(TransformChain):
                     - "('bill_sep','prepay_sep')"
     """
 
-    def __init__(self,transformations, model_config, project_settings,original_columns):
+    def __init__(self, starting_transformations, model_config, project_settings):
         Manipulator.__init__(self,model_config,project_settings,transformations) #TODO: figure out this troublesome line
         raw_interaction_strs = filter(lambda x: x.keys()[0] == 'interaction_terms',  transformations)[0]['interaction_terms']['interactions']
         compact_interactions = [eval(ris) for ris in raw_interaction_strs]
@@ -359,7 +357,7 @@ class interaction_terms(TransformChain):
             transformations = transformations[:-1] + expanded_transformations
             exp_idx = len(transformations[:-1]) + len(expanded_transformations)
         model_config['feature_settings']['feature_engineering'] = transformations
-        super(interaction_terms, self).__init__(transformations[:exp_idx], model_config, project_settings,original_columns)
+        super(interaction_terms, self).__init__(transformations[:exp_idx], model_config, project_settings)
 
 class normalize(Transformer):
     """
@@ -525,7 +523,7 @@ class as_numeric(TransformChain):
                  - <pattern> : { str:val, str:val,...}
     """
 
-    def __init__(self,transformations, model_config, project_settings,original_columns):
+    def __init__(self, starting_transformations, model_config, project_settings):
         Manipulator.__init__(self, model_config, project_settings,
                              transformations)
         expanded_transformations = list()
@@ -558,7 +556,7 @@ class as_numeric(TransformChain):
             transformations = transformations[:-1] + expanded_transformations
             exp_idx = len(transformations[:-1]) + len(expanded_transformations)
         model_config['feature_settings']['feature_engineering'] = transformations
-        super(as_numeric, self).__init__(transformations[:exp_idx], model_config, project_settings, original_columns)
+        super(as_numeric, self).__init__(transformations[:exp_idx], model_config, project_settings)
 
 class ind_as_numeric(Transformer):
     """
@@ -702,8 +700,72 @@ class include_features(Transformer):
     """
     def __init__(self, model_config, project_settings):
         super(include_features, self).__init__(model_config, project_settings)
-        self.configure_ancestors_and_features()
+        setattr(self,'exclusion_flag',True)
+        self.configure_features()
         self.set_base_transformer(Deleter(**self.kwargs))
 
     def gen_new_column_names(self, touch_indices, prior_features):
         return list()
+
+class drop_outliers(TransformChain):
+
+    def __init__(self, transformations, model_config, project_settings):
+        Manipulator.__init__(self, model_config, project_settings,
+                             transformations)
+        expanded_transformations = list()
+        transformer_names = [d.keys()[0] for d in transformations]
+        t_idx = transformer_names.index('drop_outliers')
+        i = 0
+        drop_outliers_entry = filter(lambda x: x.keys()[0] == 'drop_outliers', transformations)[0]['drop_outliers']
+        inclusion_patterns = drop_outliers_entry['inclusion_patterns']
+        for pattern in inclusion_patterns:
+            transformation_dict = dict()
+            expanded_transformer_name = '_' + str(i) + '.' + 'ind_drop_outliers'
+            transformation_dict[expanded_transformer_name] = {
+                'inclusion_patterns': [pattern],
+            }
+            expanded_transformations.append(transformation_dict)
+            i += 1
+        if t_idx == 0:
+            transformations = expanded_transformations + transformations[1:]
+            exp_idx = len(expanded_transformations)
+        elif t_idx < len(transformations) - 1:
+            transformations = transformations[0:t_idx] + expanded_transformations + transformations[t_idx + 1:]
+            exp_idx = len(transformations[0:t_idx]) + len(expanded_transformations)
+        else:
+            transformations = transformations[:-1] + expanded_transformations
+            exp_idx = len(transformations[:-1]) + len(expanded_transformations)
+        model_config['feature_settings']['feature_engineering'] = transformations
+        super(drop_outliers, self).__init__(transformations[:exp_idx], model_config, project_settings)
+
+
+
+class ind_drop_outliers(HorizontalTransformer):
+
+    def __init__(self, model_config, project_settings):
+        super(ind_drop_outliers, self).__init__(model_config, project_settings)
+        self.set_base_transformer(Truncator(**self.kwargs))
+        self.configure_features()
+
+    def fit(self, X_col, y):
+        X_mat_idx = X_col.index.tolist()
+        y = pd.Series(y, index=X_mat_idx)
+        assert X_col.shape[1] == 1
+        ti = X_col.columns[0]
+        truncator = self.base_transformer
+        truncator.fit(X_col)
+        X_mat_sub = X_col[(X_col.loc[:, ti] > truncator.lthrsh) & (X_col.loc[:, ti] < truncator.uthrsh)].copy()
+        untouched_indices = list(X_mat_sub.index)
+        touch_indices = list(set(X_mat_idx).difference(set(untouched_indices)))
+        assert len(touch_indices) + len(untouched_indices) == len(X_col)
+        self.touch_indices = touch_indices
+        self.untouched_indices = untouched_indices
+        #setattr(self.base_transformer, 'touch_indices', touch_indices)
+        #setattr(self.base_transformer, 'untouched_indices', untouched_indices)
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        relevant_features = [prior_features[ti] for ti in touch_indices]
+        new_features = list()
+        for rf in relevant_features:
+            new_features.append('trunc(' + rf + ')')
+        return new_features
