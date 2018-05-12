@@ -23,16 +23,22 @@ class Manipulator(object):
         if not self.is_manipulator_chain():
             if len(manipulations) > 0:
                 manipulator_names = [d.keys()[0] for d in manipulations]
-                order = model_config['feature_settings']['order']
-                if order == 0:
-                    prior_manipulator_feature_names_filepath = self.det_prior_feature_names_filepath(model_config)
-                    manipulator_name = manipulator_names[0]
+                if model_config['feature_settings'].has_key('order'):
+                    order = model_config['feature_settings']['order']
+                    if order == 0:
+                        prior_manipulator_feature_names_filepath = self.det_prior_init_feature_names_filepath(model_config)
+                        manipulator_name = manipulator_names[0]
+                    else:
+                        prior_transform = manipulator_names[order-1]
+                        prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_transform)
+                        manipulator_name = manipulator_names[order]
+                    self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
+                    self.manipulator_name = manipulator_name
                 else:
-                    prior_transform = manipulator_names[order-1]
-                    prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_transform)
-                    manipulator_name = manipulator_names[order]
-                self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
-                self.manipulator_name = manipulator_name
+                    prior_manipulator_name = manipulations[-1:][0].keys()[0]
+                    prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_manipulator_name)
+                    self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
+                    self.manipulator_name = 'algorithm'
             else:
                 pass
 
@@ -46,7 +52,7 @@ class Manipulator(object):
         else:
             return False
 
-    def det_prior_feature_names_filepath(self,model_config):
+    def det_prior_init_feature_names_filepath(self, model_config):
         raise NotImplementedError
 
     def _det_output_features_filepath(self,manipulator_name):

@@ -54,16 +54,6 @@ class Manager:
         else:
             X_1st, y_1st = tc.transform(X,y, dataset_name)
             X_2nd, y_2nd = fc.transform(X_1st,y_1st, dataset_name)
-            total_manipulations = tc.transformations + fc.filters
-
-        if len(total_manipulations) > 0:
-            manipulator_name = total_manipulations[-1].keys()[0]
-            manipulator = [v for (k,v) in total_manipulations[-1][manipulator_name].items() if 'initialized' in k][0]
-            setattr(self,'working_features',manipulator.features)
-        else:
-            filepath = load_clean_input_file_filepath(project_settings,'feature_names')
-            inv_column_map = load_inv_column_map(filepath)
-            setattr(self,'working_features',flip_dict(inv_column_map))
 
 
         return X_2nd, y_2nd

@@ -110,7 +110,7 @@ class Transformer(Manipulator):
             self.store = False
         self.inclusion_patterns = transformer_settings['inclusion_patterns']
 
-    def det_prior_feature_names_filepath(self,model_config):
+    def det_prior_init_feature_names_filepath(self, model_config):
         project_settings = self.project_settings
         if not model_config['feature_settings']['select_before_eng']:
             prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
@@ -308,7 +308,7 @@ class interaction_terms(TransformChain):
                     - "('bill_sep','prepay_sep')"
     """
 
-    def __init__(self, starting_transformations, model_config, project_settings):
+    def __init__(self, transformations, model_config, project_settings):
         Manipulator.__init__(self,model_config,project_settings,transformations) #TODO: figure out this troublesome line
         raw_interaction_strs = filter(lambda x: x.keys()[0] == 'interaction_terms',  transformations)[0]['interaction_terms']['interactions']
         compact_interactions = [eval(ris) for ris in raw_interaction_strs]

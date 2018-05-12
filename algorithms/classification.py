@@ -1,19 +1,20 @@
 import graphviz
 
-from utils import flip_dict
+from utils import flip_dict, load_inv_column_map
 from wrapper import Wrapper
 from sklearn import tree
 from django.utils.text import slugify
 
-class Decision_Tree_Classifier(Wrapper):
+class DecisionTreeClassifier(Wrapper):
 
-    def __init__(self, model_config, project_settings):
+    def __init__(self, model_config, project_settings, mode='algorithm'):
         base_algo_class = tree.DecisionTreeClassifier
-        super(Decision_Tree_Classifier, self).__init__(base_algo_class, model_config, project_settings)
+        super(DecisionTreeClassifier, self).__init__(base_algo_class, model_config, project_settings, mode)
 
     def gen_output(self):
         clf = self.base_algorithm
-        inv_col_map = self.inv_column_map
+        prior_feature_names_filepath = self.prior_manipulator_feature_names_filepath
+        inv_col_map = load_inv_column_map(prior_feature_names_filepath)
         col_map = flip_dict(inv_col_map)
         num_cols = len(col_map)
         column_names = [col_map[i] for i in range(num_cols)]

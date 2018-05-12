@@ -1,9 +1,10 @@
 import pandas as pd
 import importlib
+import copy
 
 from manipulator import ManipulatorChain, Manipulator
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
-from algorithms.classification import Decision_Tree_Classifier
+from algorithms.classification import DecisionTreeClassifier
 
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
@@ -107,7 +108,7 @@ class Filter(Manipulator):
         filtered_features = {k: v for k, v in column_map.iteritems() if k in untouched_indices}
         self.features = filtered_features
 
-    def det_prior_feature_names_filepath(self,model_config):
+    def det_prior_init_feature_names_filepath(self, model_config):
         project_settings = self.project_settings
         if model_config['feature_settings']['select_before_eng']:
             prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
@@ -169,27 +170,29 @@ class tree_based(Filter):
     """
     def __init__(self,model_config,project_settings):
         super(tree_based,self).__init__(model_config,project_settings)
-        self.tree_based_settings = self.fetch_filter_settings('tree_based')
+        tree_model_config = self.fetch_filter_settings('tree_based')
+        tree_model_config['feature_settings'] = model_config['feature_settings']
+        tree_model_config['model_name'] = model_config['model_name'] + '-tree-based-feature-selection'
+        clf = DecisionTreeClassifier(tree_model_config, project_settings, mode='filter')
+        setattr(self,'clf',clf)
 
-    def fit(self,X_mat,y,project_settings):
 
-        tree_based_settings = self.tree_based_settings
-        tree_based_settings['model_name'] = 'tree-based-feature-selection' #TODO: add this onto existing model name
-        clf = Decision_Tree_Classifier(tree_based_settings,project_settings)
-        clf = clf.fit(X_mat, y)
+    def fit(self,X_mat,y):
+        tree_model_config = self.fetch_filter_settings('tree_based')
+        clf = self.clf
+        clf.fit(X_mat, y)
         if clf.gen_output_flag:
             clf.gen_output()
-
-        if tree_based_settings['other_options'].has_key('selection_threshold'):
-            selection_threshold = tree_based_settings['other_options']['selection_threshold']
+        if tree_model_config['other_options'].has_key('selection_threshold'):
+            selection_threshold = tree_model_config['other_options']['selection_threshold']
         else:
             selection_threshold = None
         model = SelectFromModel(clf, prefit=True, threshold=selection_threshold)
-        #model.fit(X_mat)
         ir = pd.Series(model.get_support())
         untouched_indices = ir[ir == True].index
         touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
         self._store_indices_and_features(untouched_indices,touch_indices)
+
 
 class f_based(Filter):
     """

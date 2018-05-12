@@ -2,30 +2,58 @@ import os
 
 import pandas as pd
 
+from feature.manipulator import Manipulator
 from django.utils.text import slugify
-from utils import find_project_dir, load_working_file_filepath, load_inv_column_map
+from utils import find_project_dir, load_working_file_filepath, load_inv_column_map, load_clean_input_file_filepath
 
-class Wrapper(object):
+class Wrapper(Manipulator):
 
-    def __init__(self, base_algorithm_class, model_config, project_settings):
+    def __init__(self, base_algorithm_class, model_config, project_settings, mode='algorithm'):
         kwargs = model_config['keyword_arg_settings']
         other_options = model_config['other_options']
         self.model_name = model_config['model_name']
         self.base_algorithm = base_algorithm_class(**kwargs)
+        self.mode = mode
         if other_options.has_key('gen_output'):
             arg_val = other_options['gen_output']
             self.gen_output_flag = arg_val
-            if self.gen_output_flag:
-                project_dir = find_project_dir(project_settings)
-                artifact_dir = project_dir + '/model_artifacts'
-                if not os.path.isdir(artifact_dir):
-                    os.makedirs(artifact_dir)
-                self.artifact_dir = artifact_dir
-                feature_names_filepath = load_working_file_filepath(project_settings,'feature_names')
-                inv_column_map = load_inv_column_map(feature_names_filepath)
-                self.inv_column_map = inv_column_map
         else:
             self.gen_output_flag = False
+        if model_config['feature_settings']['select_before_eng']:
+            manipulations = model_config['feature_settings']['feature_selection'] + model_config['feature_settings']['feature_engineering']
+        else:
+            manipulations = model_config['feature_settings']['feature_engineering'] + model_config['feature_settings']['feature_selection']
+        super(Wrapper,self).__init__(model_config,project_settings,manipulations)
+
+    def det_prior_init_feature_names_filepath(self, model_config):
+        project_settings = self.project_settings
+        filters = model_config['feature_settings']['feature_selection']
+        transformers = model_config['feature_settings']['feature_engineering']
+        mode = self.mode
+        if model_config['feature_settings']['select_before_eng']:
+            if mode == 'transformer':
+                if len(filters) > 0:
+                    prior_manipulator_name = filters[-1].keys()[0]
+                    prior_manipulator_filepath = self._det_output_features_filepath(prior_manipulator_name)
+                else:
+                    prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+            elif mode == 'filter':
+                prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+            else:
+                raise NotImplementedError
+        else:
+            if mode == 'transformer':
+                prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+            elif mode == 'filter':
+                if len(transformers) > 0:
+                    prior_manipulator_name = transformers[-1].keys()[0]
+                    prior_manipulator_filepath = self._det_output_features_filepath(prior_manipulator_name)
+                else:
+                    prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+            else:
+                raise NotImplementedError
+        return prior_manipulator_filepath
+
 
     def fit(self,X,y):
         self.base_algorithm.fit(X,y)
