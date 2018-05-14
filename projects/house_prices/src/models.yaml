@@ -1,0 +1,289 @@
+Models:
+#
+#  Base LR:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+##
+#  Base LR with as_numeric:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#          - include_features:
+#              inclusion_patterns:
+#              - 'id'
+#              - 'GrLivArea'
+#              - 'TotalBsmtSF'
+#              - 'OpenPorchSF'
+#              - 'BsmtFinSF1'
+#          - drop_outliers:
+#              inclusion_patterns:
+#                - 'BsmtFinSF1'
+#                - 'GrLivArea'
+#
+#
+#  Stacked LR with RF and GBR predict:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#        - standard_scale:
+#            inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+#                'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+#                'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+#                'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+#                 'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+#                'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+#        - RF.predict:
+#            inclusion_patterns:
+#              - "All"
+#            base_algorithm: sklearn.ensemble.RandomForestRegressor
+#            keyword_arg_settings:
+#              random_state: 1234
+#        - reset_data:
+#            inclusion_patterns:
+#              All But:
+#                - 'RF.predict_hat'
+#        - GBR.predict:
+#            inclusion_patterns:
+#              All But:
+#                - "RF.predict_hat"
+#            base_algorithm: sklearn.ensemble.GradientBoostingRegressor
+#            keyword_arg_settings:
+#              random_state: 1234
+#        - include_features:
+#            inclusion_patterns: ["RF.predict_hat","GBR.predict_hat"]
+#
+#  Linear Regression f_based FS K=40:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_selection:
+#        - f_based:
+#            keyword_arg_settings: {}
+#            other_options:
+#              k: 40
+#
+#  Linear Regression f_based FS K=45:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_selection:
+#        - f_based:
+#            keyword_arg_settings: {}
+#            other_options:
+#              k: 45
+#
+  Linear Regression tree-based FS:
+    base_algorithm: sklearn.linear_model.LinearRegression
+    feature_settings:
+      feature_selection:
+        - tree_based:
+              keyword_arg_settings: {random_state: 1234}
+              other_options: {}
+
+#
+##  Random Forest Base:
+##    base_algorithm: sklearn.ensemble.RandomForestRegressor
+##
+##  Neural Network Base:
+##    base_algorithm: sklearn.neural_network.MLPRegressor
+##
+#  RandomForest Base Scaled:
+#    base_algorithm: algorithms.regression.RandomForestRegressor
+#    keyword_arg_settings:
+#      random_state: 1234
+#    other_options:
+#      gen_output: True
+#    feature_settings:
+#      feature_engineering:
+#        - standard_scale:
+#            inclusion_patterns:
+#              - "All"
+#
+##  SVM Base:
+##    base_algorithm: sklearn.svm.SVR
+##
+#  RandomForest Base Scaled remove id:
+#    base_algorithm: algorithms.regression.RandomForestRegressor
+#    keyword_arg_settings:
+#      random_state: 1234
+#    feature_settings:
+#      select_before_eng: True
+#      feature_engineering:
+#        - exclude_features:
+#            inclusion_patterns:
+#              - 'id'
+#        - standard_scale:
+#            inclusion_patterns:
+#              - "All"
+#
+#  RandomForest Base Scaled remove id and lincombos:
+#    base_algorithm: algorithms.regression.RandomForestRegressor
+#    keyword_arg_settings:
+#      random_state: 1234
+#    feature_settings:
+#      feature_engineering:
+#        - exclude_features:
+#            inclusion_patterns:
+#              - 'id'
+#              - 'GrLivArea'
+#              - 'TotalBsmtSF'
+#        - standard_scale:
+#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+#                   'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+#
+##  Base GBR:
+##    base_algorithm: sklearn.ensemble.GradientBoostingRegressor
+##    keyword_arg_settings:
+##      random_state: 1234
+##
+#
+#  GBR Inter:
+#    base_algorithm: sklearn.ensemble.GradientBoostingRegressor
+#    keyword_arg_settings:
+#      random_state: 1234
+#    feature_settings:
+#      feature_engineering:
+#        - exclude_features:
+#            inclusion_patterns:
+#              - 'id'
+#              - 'GrLivArea'
+#              - 'TotalBsmtSF'
+#        - standard_scale:
+#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+#                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+#        - interaction_terms:
+#            interactions:
+#              - "('YearRemodAdd','YearBuilt')"
+#              - "('WoodDeckSF','PoolArea')"
+#              - "('BsmtQual','BsmtExposure')"
+#              - "('YearBuilt','ExterQual')"
+#              - "('Functional','KitchenQual')"
+#
+#
+#  RandomForest Base Scaled Interactions:
+#    base_algorithm: algorithms.regression.RandomForestRegressor
+#    keyword_arg_settings:
+#      random_state: 1234
+#    other_options:
+#      gen_output: True
+#    feature_settings:
+#      feature_engineering:
+#        - exclude_features:
+#            inclusion_patterns:
+#              - 'id'
+#              - 'GrLivArea'
+#              - 'TotalBsmtSF'
+#        - standard_scale:
+#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+#                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+#        - interaction_terms:
+#            interactions:
+#              - "('YearRemodAdd','YearBuilt')"
+#              - "('scaled(WoodDeckSF)','scaled(PoolArea)')"
+#              - "('BsmtQual','BsmtExposure')"
+#              - "('YearBuilt','ExterQual')"
+#              - "('Functional','KitchenQual')"
+#        - interpolate:
+#            inclusion_patterns:
+#             - 'scaled(OverallQual)'
+#            kwargs:
+#              lowess: {}
+#              interp1d: {}
+#
+#  RandomForest Base Scaled Interactions and LOO MoSold:
+#    base_algorithm: algorithms.regression.RandomForestRegressor
+#    keyword_arg_settings:
+#      random_state: 1234
+##    other_options:
+##      gen_output: True
+#    feature_settings:
+#      feature_engineering:
+#        - exclude_features:
+#            inclusion_patterns:
+#              - 'id'
+#              - 'GrLivArea'
+#              - 'TotalBsmtSF'
+#        - standard_scale:
+#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+#                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+#        - interaction_terms:
+#            interactions:
+#              - "('YearRemodAdd','YearBuilt')"
+#              - "('scaled(WoodDeckSF)','scaled(PoolArea)')"
+#              - "('BsmtQual','BsmtExposure')"
+#              - "('YearBuilt','ExterQual')"
+#              - "('Functional','KitchenQual')"
+#        - interpolate:
+#            inclusion_patterns:
+#             - 'scaled(OverallQual)'
+#            kwargs:
+#              lowess: {}
+#              interp1d: {}
+#        - loo_encoding:
+#            inclusion_patterns:
+#              - "MoSold"
+#
+#  RandomForest Base Scaled Non Year:
+#    base_algorithm: algorithms.regression.RandomForestRegressor
+#    keyword_arg_settings:
+#      random_state: 1234
+#    feature_settings:
+#      feature_engineering:
+#        - exclude_features:
+#            inclusion_patterns:
+#              - 'id'
+#      feature_engineering:
+#        - standard_scale:
+#            inclusion_patterns: [ '3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+#                  'LotArea', 'GrLivArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+#                  'TotalBsmtSF', 'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+#        - interaction_terms:
+#            interactions:
+#              - "('scaled(OverallQual)','scaled(YearBuilt)')"
+#
+#  LR Base Scaled-PCA:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_engineering:
+#        - standard_scale:
+#            inclusion_patterns:
+#              - "All"
+#        - pca:
+#            inclusion_patterns:
+#             - 'All'
+#            kwargs:
+#              n_components: 2
+#
+#  RandomForest tree-based FS:
+#    base_algorithm: sklearn.ensemble.RandomForestRegressor
+#    feature_settings:
+#      feature_selection:
+#        - f_based:
+#              keyword_arg_settings: {}
+#              other_options:
+#                k: 45
+#
+#  Linear Regression l1_based FS:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    feature_settings:
+#      feature_selection:
+#           - l1_based:
+#               method: "LinearSVC"
+#               kwargs:
+#                 dual: False
