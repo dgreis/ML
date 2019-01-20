@@ -7,11 +7,13 @@ from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
 from algorithms.classification import DecisionTreeClassifier
 
 from sklearn.svm import LinearSVC
+from sklearn.linear_model import Lasso
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import SelectFromModel
 from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import SelectKBest
 from sklearn.feature_selection import f_classif
+from sklearn.feature_selection import f_regression
 
 class FilterChain(ManipulatorChain):
 
@@ -143,15 +145,23 @@ class l1_based(Filter):
         l1_settings = self.l1_settings
         method = l1_settings['method']
         kwargs = l1_settings['kwargs']
-        kwargs['penalty'] = 'l1'
         if method == "LinearSVC":
+            kwargs['penalty'] = 'l1'
             l1_model = LinearSVC(**kwargs)
         elif method == "LogisticRegression":
+            kwargs['penalty'] = 'l1'
             l1_model = LogisticRegression(**kwargs)
+        elif method == "Lasso":
+            l1_model = Lasso(**kwargs)
         else:
             raise NotImplementedError
         l1_model.fit(X_mat, y)
-        s = pd.Series(l1_model.coef_.sum(0))
+        if method == "LinearSVC":
+            s = pd.Series(l1_model.coef_.sum(0))
+        elif method == "Lasso":
+            s = pd.Series(l1_model.coef_)
+        else:
+            raise NotImplementedError
         untouched_indices = s[abs(s) > 0.0001].index.tolist()
         touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
         self._store_indices_and_features(untouched_indices,touch_indices)
@@ -173,7 +183,7 @@ class tree_based(Filter):
         tree_model_config = self.fetch_filter_settings('tree_based')
         tree_model_config['feature_settings'] = model_config['feature_settings']
         tree_model_config['model_name'] = model_config['model_name'] + '-tree-based-feature-selection'
-        clf = DecisionTreeClassifier(tree_model_config, project_settings, mode='filter')
+        clf = DecisionTreeClassifier(tree_model_config, project_settings, mode='filter') #TODO: Consider parameterizing this to use diff algo, i.e. Regression?
         setattr(self,'clf',clf)
 
 
@@ -203,6 +213,7 @@ class f_based(Filter):
          feature_settings:
            feature_selection:
             - f_based:
+               method: <str> i.e. 'regression or classif'
                keyword_arg_settings: {}
                other_options:
                     k: <int>
@@ -214,10 +225,17 @@ class f_based(Filter):
 
     def fit(self,X_mat,y):
         f_based_settings = self.f_based_settings
+        method = f_based_settings['method']
+        if method == "classif":
+            f_model = f_classif
+        elif method == 'regression':
+            f_model = f_regression
+        else:
+            raise NotImplementedError
         other_options = f_based_settings['other_options']
         k = other_options['k']
 
-        selector = SelectKBest(f_classif, k=k).fit(X_mat, y)
+        selector = SelectKBest(f_model, k=k).fit(X_mat, y)
         ir = pd.Series(selector.get_support())
         untouched_indices = ir[ir == True].index
         touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
