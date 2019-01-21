@@ -38,7 +38,7 @@ def rmsle(real, predicted):
     sum=0.0
     for x in range(len(predicted)):
         if predicted[x]<0 or real[x]<0: #check for negative values
-            continue
+            return np.nan
         p = np.log(predicted[x]+1)
         r = np.log(real[x]+1)
         sum = sum + (p - r)**2
