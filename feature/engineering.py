@@ -130,9 +130,12 @@ class Transformer(Manipulator):
         self.touch_indices = touch_cols
         self.untouched_indices = untouched_cols
         touch_cols = self.touch_indices
-        new_features = self.gen_new_column_names(touch_cols, prior_features)
-        new_feature_set = self.reindex(prior_features, new_features)
-        self.features = new_feature_set
+        if not isinstance(self, HorizontalTransformer):
+            new_features = self.gen_new_column_names(touch_cols, prior_features)
+            new_feature_set = self.reindex(prior_features, new_features)
+            self.features = new_feature_set
+        else:
+            self.features = prior_features
         self.output_features()
 
     def load_prior_features(self):
@@ -377,6 +380,7 @@ class normalize(Transformer):
         super(normalize, self).__init__(model_config, project_settings )
         self.set_base_transformer(Normalizer(**self.kwargs))
         self.configure_features()
+        pass
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         Xt_feat_names = list()
@@ -708,7 +712,7 @@ class include_features(Transformer):
         return list()
 
 class drop_outliers(TransformChain):
-
+    """TODO: Documentation?"""
     def __init__(self, transformations, model_config, project_settings):
         Manipulator.__init__(self, model_config, project_settings,
                              transformations)
@@ -738,8 +742,6 @@ class drop_outliers(TransformChain):
         model_config['feature_settings']['feature_engineering'] = transformations
         super(drop_outliers, self).__init__(transformations[:exp_idx], model_config, project_settings)
 
-
-
 class ind_drop_outliers(HorizontalTransformer):
 
     def __init__(self, model_config, project_settings):
@@ -763,9 +765,10 @@ class ind_drop_outliers(HorizontalTransformer):
         #setattr(self.base_transformer, 'touch_indices', touch_indices)
         #setattr(self.base_transformer, 'untouched_indices', untouched_indices)
 
-    def gen_new_column_names(self, touch_indices, prior_features):
-        relevant_features = [prior_features[ti] for ti in touch_indices]
-        new_features = list()
-        for rf in relevant_features:
-            new_features.append('trunc(' + rf + ')')
-        return new_features
+    # TODO: Delete this? Should HorizontalTransformers ever implement gen_new_column_names?
+    # def gen_new_column_names(self, touch_indices, prior_features):
+    #     relevant_features = [prior_features[ti] for ti in touch_indices]
+    #     new_features = list()
+    #     for rf in relevant_features:
+    #         new_features.append('trunc(' + rf + ')')
+    #     return new_features
