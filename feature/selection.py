@@ -5,6 +5,7 @@ import copy
 from manipulator import ManipulatorChain, Manipulator
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
 from algorithms.classification import DecisionTreeClassifier
+from algorithms.regression import DecisionTreeRegressor
 
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
@@ -175,6 +176,7 @@ class tree_based(Filter):
         feature_settings:
           feature_selection:
            - tree_based:
+              method: <str> "classification" or "regression"
               keyword_arg_settings: {}
               other_options: {}
     """
@@ -183,22 +185,29 @@ class tree_based(Filter):
         tree_model_config = self.fetch_filter_settings('tree_based')
         tree_model_config['feature_settings'] = model_config['feature_settings']
         tree_model_config['model_name'] = model_config['model_name'] + '-tree-based-feature-selection'
-        clf = DecisionTreeClassifier(tree_model_config, project_settings, mode='filter') #TODO: Consider parameterizing this to use diff algo, i.e. Regression?
-        setattr(self,'clf',clf)
+        method = tree_model_config['method']
+        if method == 'classification':
+            model = DecisionTreeClassifier(tree_model_config, project_settings, mode='filter')
+            #TODO: Consider parameterizing this to use diff algo, i.e. Regression?
+        elif method == 'regression':
+            model = DecisionTreeRegressor(tree_model_config,project_settings,mode='filter')
+        else:
+            raise NotImplementedError
+        setattr(self,'model',model)
 
 
     def fit(self,X_mat,y):
         tree_model_config = self.fetch_filter_settings('tree_based')
-        clf = self.clf
-        clf.fit(X_mat, y)
-        if clf.gen_output_flag:
-            clf.gen_output()
+        model = self.model
+        model.fit(X_mat, y)
+        if model.gen_output_flag:
+            model.gen_output()
         if tree_model_config['other_options'].has_key('selection_threshold'):
             selection_threshold = tree_model_config['other_options']['selection_threshold']
         else:
             selection_threshold = None
-        model = SelectFromModel(clf, prefit=True, threshold=selection_threshold)
-        ir = pd.Series(model.get_support())
+        selector = SelectFromModel(model, prefit=True, threshold=selection_threshold)
+        ir = pd.Series(selector.get_support())
         untouched_indices = ir[ir == True].index
         touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
         self._store_indices_and_features(untouched_indices,touch_indices)

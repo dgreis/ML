@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 from wrapper import Wrapper
 from sklearn import ensemble
+from sklearn import tree
 from django.utils.text import slugify
 
 class RandomForestRegressor(Wrapper):
@@ -42,3 +43,9 @@ class RandomForestRegressor(Wrapper):
         artifact_dir = self.artifact_dir
         model_name = self.model_name
         f.savefig(artifact_dir + '/' + slugify(model_name) + 'feature-importance-plot.pdf')
+
+class DecisionTreeRegressor(Wrapper):
+
+    def __init__(self, model_config, project_settings, mode='algorithm'):
+        base_algo_class = tree.DecisionTreeRegressor
+        super(DecisionTreeRegressor, self).__init__(base_algo_class, model_config, project_settings, mode)
