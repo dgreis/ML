@@ -6,6 +6,9 @@ from sklearn import ensemble
 from sklearn import tree
 from django.utils.text import slugify
 
+##NOTE: I believe you only need to implement regression algorithms here that require something more.
+##      i.e. for RandomForestRegressor, there is the feature importances which is output
+
 class RandomForestRegressor(Wrapper):
 
     def __init__(self, model_config, project_settings):
@@ -44,7 +47,7 @@ class RandomForestRegressor(Wrapper):
         model_name = self.model_name
         f.savefig(artifact_dir + '/' + slugify(model_name) + 'feature-importance-plot.pdf')
 
-class DecisionTreeRegressor(Wrapper):
+class DecisionTreeRegressor(Wrapper):  ##TODO: Can this be taken out? Because it doesn't implement anything beyond OTB sklearn functionality?
 
     def __init__(self, model_config, project_settings, mode='algorithm'):
         base_algo_class = tree.DecisionTreeRegressor
