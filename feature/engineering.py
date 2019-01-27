@@ -176,6 +176,10 @@ class Transformer(Manipulator):
                 assert inclusion_patterns.keys() == ['All But']
                 exclusion_flag = True
                 inclusion_patterns = inclusion_patterns['All But']
+            elif inclusion_patterns == "All Numeric":
+                project_settings = self.project_settings
+                assert project_settings.has_key('numeric_features')
+                inclusion_patterns = project_settings['numeric_features']
             for pattern in inclusion_patterns:
                 len_pat = len(pattern)
                 pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
@@ -374,7 +378,7 @@ class normalize(Transformer):
                     - <pattern>
      (You can also specify 'All Numeric' to normalize all numeric columns, provided
      that you include a list of the numeric feature names in the project_settings yaml
-     file in the src folder of the project directory)
+     file in the src folder of the project directory) with the key 'numeric_features'
     """
     def __init__(self, model_config, project_settings):
         super(normalize, self).__init__(model_config, project_settings )
@@ -403,7 +407,7 @@ class standard_scale(Transformer):
                     - <pattern>
      (You can also specify 'All Numeric' to scale all numeric columns, provided
      that you include a list of the numeric feature names in the project_settings yaml
-     file in the src folder of the project directory)
+     file in the src folder of the project directory) with the key 'numeric_features'
     """
     def __init__(self, model_config, project_settings):
         super(standard_scale, self).__init__(model_config, project_settings )
