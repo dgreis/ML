@@ -54,7 +54,7 @@ class CrossValidator:
         for setting in grid:
             if grid != ['default']:
                 for param in setting:
-                    setattr(model,param,setting[param])
+                    setattr(model.base_algorithm,param,setting[param])
             setting_name = str(setting)
             print("\ttuning hyperparam for setting: " + setting_name + " (" + str(i) +'/' + str(num_settings) + ")")
             setting_folds_entries = self.do_folds(data, model, num_folds, setting_name)
@@ -85,7 +85,12 @@ class CrossValidator:
             for mean, std, params in zip(means, stds, score_df['setting']):
                 print("\t%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
             score_df.loc[:,'sort_value'] = score_df.loc[:,'content'].apply(lambda x: x[0])
-            score_df.sort_values('sort_value', ascending=False,inplace=True)
+            problem_type = self.project_settings['ml_problem_type'] #TODO: Fix this if it turns out this hacky way of minimizing regression and maximizing classification metrics doesn't work
+            if problem_type == 'regression':
+                ascending_value = True
+            else:
+                ascending_value = False
+            score_df.sort_values('sort_value', ascending=ascending_value,inplace=True)
             score_df.reset_index(drop=True,inplace=True)
             print("\tBest hyperparam setting: " + score_df.loc[0, 'setting'] + " @ " + str(score_df.loc[0, 'sort_value']))
             self.optimal_hyperparams = eval(score_df.loc[0, 'setting'])
