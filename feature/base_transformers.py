@@ -1,7 +1,7 @@
 import pandas as pd
 from numpy import random as npr
 from scipy.interpolate import interp1d
-
+from algorithms.algoutils import get_algo_class
 from utils import flip_dict
 
 
@@ -105,6 +105,49 @@ class LeaveOneOutEncoder:
             assert not pd.isnull(cat_means).any()
             return pd.DataFrame(cat_means,index=X_touch.index)
 
+class Stacker:
+
+    def __init__(self, stacker_algo_name, keyword_arg_settings):
+        self.stacker_algo_name = stacker_algo_name
+        self.keyword_arg_settings = keyword_arg_settings
+
+    def fit(self, X_touch, y_touch):
+        loo_vals = dict()
+        assert len(X_touch) == len(y_touch)
+        y_ser = pd.Series(y_touch, index=X_touch.index)
+        stacker_algo_name = self.stacker_algo_name
+        #print "\t\tPerforming LOO Stacking Procedure . . . "
+        cnt = 0
+        for i in X_touch.index:
+            X_no_i = X_touch.drop([i])
+            y_no_i = y_ser.drop(i)
+            stacker_algo_class = get_algo_class(stacker_algo_name)
+            stacker_algo_instance = stacker_algo_class(**self.keyword_arg_settings)
+            stacker_algo_instance.fit(X_no_i,y_no_i)
+            reshaped_i = X_touch.loc[i].values.reshape(1,-1)
+            y_hat = stacker_algo_instance.predict(reshaped_i)
+            assert len(y_hat) == 1
+            loo_vals[i] = y_hat[0]
+            if (cnt % 100 == 0) and (cnt != 0):
+                print '\t\tLOO proc completed ' + str(cnt) + ' times'
+            cnt += 1
+        self.loo_vals = loo_vals
+        stacker_algo_full = stacker_algo_class(**self.keyword_arg_settings)
+        stacker_algo_full.fit(X_touch,y_ser)
+        self.stacker_algo_full = stacker_algo_full
+
+    def transform(self, X_touch, dataset_name):
+        if dataset_name == 'train':
+            loo_vals = self.loo_vals
+            assert (loo_vals.keys() == X_touch.index).all()
+            assert not pd.isnull(loo_vals.values()).any()
+            return pd.DataFrame(loo_vals.values(),index=loo_vals.keys())
+            #return loo_vals.values()
+        else:
+            stacker_algo_full = self.stacker_algo_full
+            y_hat = stacker_algo_full.predict(X_touch)
+            return y_hat
+
 class Deleter(object):
 
     def __init__(self):
@@ -122,6 +165,7 @@ class Truncator:
         pass
 
     def fit(self,X_col):
+        #TODO: Figure out where the actual truncating happens. Not sure just looking at fit/transform methods
         #implementing 1.5xIQR rule for now
         desc = X_col.describe()
         IQR = (desc.loc['75%'] - desc.loc['25%']).values[0]

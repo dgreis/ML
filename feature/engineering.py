@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Truncator, Deleter, Identity, \
-    Sampler
+    Sampler, Stacker
 from manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -473,6 +473,93 @@ class loo_encoding(Transformer):
         new_feature_name = 'loo(' + pattern  + ')'
         return [new_feature_name]
 
+class stack(TransformChain):
+    """Example in models.yaml file:
+        Models:
+          Model Name:
+            base_algorithm: sklearn.linear_model.LinearRegression #This is combo method outlined in ESL, Chapter 8.8
+            feature_engineering:
+                - stack:
+                    algorithms:
+                    - <fully qualified algo> (i.e. sklearn.ensemble.RandomForestRegressor)
+                        keyword_arg_settings:
+                            random_state: 1234  #(this is illustrative)
+                    - <another fully qualified algo>:
+                        keyword_arg_settings:
+                            ...
+        # At bottom of feature engineering section, be sure to include only the derived algo columns
+                - include_features:
+                    inclusion_patterns: [<fully qualified algo 1>(str) + '.hat',
+                                        <fully qualified algo 2>(str) + '.hat']
+    """
+    def __init__(self, starting_transformations, model_config, project_settings):
+        Manipulator.__init__(self, model_config, project_settings,
+                             starting_transformations)
+        expanded_transformations = list()
+        transformer_names = [d.keys()[0] for d in starting_transformations]
+        t_idx = transformer_names.index('stack')
+        i = 0
+        stack_entry = filter(lambda x: x.keys()[0] == 'stack', starting_transformations)[0]['stack']
+        algorithms = stack_entry['algorithms']
+        derived_cols = list()
+        for algorithm_dict in algorithms:
+            transformation_dict = dict()
+            expanded_transformer_name = '_' + str(i) + '.' + 'ind_stack'
+            algorithm_name = algorithm_dict.keys()[0]
+            assert len(algorithm_dict) == 1
+            if len(derived_cols) == 0:
+                inclusion_patterns = ['All']
+            else:
+                inclusion_patterns = {'All But': derived_cols}
+            transformation_dict[expanded_transformer_name] = {
+                'algorithm': algorithm_dict.keys()[0],
+                'inclusion_patterns': inclusion_patterns,
+                'keyword_arg_settings' : algorithm_dict[algorithm_name]['keyword_arg_settings']
+            }
+            derived_cols = derived_cols + [algorithm_name + '.hat']
+            expanded_transformations.append(transformation_dict)
+            i += 1
+            pass
+        if t_idx == 0:
+            starting_transformations = expanded_transformations + starting_transformations[1:]
+            exp_idx = len(expanded_transformations)
+        elif t_idx < len(starting_transformations) - 1:
+            starting_transformations = starting_transformations[0:t_idx] + expanded_transformations + starting_transformations[t_idx + 1:]
+            exp_idx = len(starting_transformations[0:t_idx]) + len(expanded_transformations)
+        else:
+            starting_transformations = starting_transformations[:-1] + expanded_transformations
+            exp_idx = len(starting_transformations[:-1]) + len(expanded_transformations)
+        model_config['feature_settings']['feature_engineering'] = starting_transformations
+        super(stack, self).__init__(starting_transformations[:exp_idx], model_config, project_settings)
+
+class ind_stack(Transformer):
+    """
+    This is a utility transformation, used by stack TransformChain transformer
+    """
+    def __init__(self, model_config, project_settings):
+        super(ind_stack, self).__init__(model_config, project_settings)
+        ind_stack_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
+        ['feature_engineering'])[0][self.manipulator_name]
+        self.stacking_algorithm_name = ind_stack_entry['algorithm']
+        self.configure_features()
+        keyword_arg_settings = dict()
+        if ind_stack_entry.has_key('keyword_arg_settings'):
+            keyword_arg_settings = ind_stack_entry['keyword_arg_settings']
+        self.set_base_transformer(Stacker(self.stacking_algorithm_name, keyword_arg_settings))
+
+    def transform(self,X_touch,y_touch,dataset_name):
+        stacker_instance = self.base_transformer
+        col_loc = X_touch.columns.max() + 1
+        ow = X_touch.shape[1]
+        X_touch.loc[:,col_loc] = stacker_instance.transform(X_touch,dataset_name)
+        assert X_touch.shape[1] > ow
+        return X_touch, y_touch
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        stacking_algorithm_name = self.stacking_algorithm_name
+        new_feature_name = stacking_algorithm_name + '.hat'
+        feature_names = [prior_features[i] for i in touch_indices]
+        return feature_names + [new_feature_name]
 
 class interpolate(Transformer):
     """Example in models.yaml file:
@@ -632,6 +719,7 @@ class sample(HorizontalTransformer):
 class predict(Transformer):
 
     def __init__(self,model_config,project_settings):
+        #TODO: Review this logic
         super(predict, self).__init__(model_config, project_settings)
         predict_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
                         ['feature_engineering'])[0][self.manipulator_name]
