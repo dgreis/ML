@@ -12,7 +12,7 @@ def configure_algorithms(model_configs, project_settings):
         base_algorithm = models[model_name]['base_algorithm']
         base_algo_class = get_algo_class(base_algorithm)
         if 'algorithms' not in base_algorithm:
-            base_algo_instance = Wrapper(base_algo_class, model_config, project_settings)
+            base_algo_instance = Wrapper(base_algo_class, model_config, project_settings) #Wrapper is used for algos implemented by others, i.e. sklearn
         else:
             base_algo_instance = base_algo_class(model_config, project_settings)
         algos[model_name] = base_algo_instance
