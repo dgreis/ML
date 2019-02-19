@@ -69,11 +69,16 @@ class Manager:
         data_dir = find_data_dir(project_settings)
         data = dict()
 
+        if project_settings.has_key('take_nth_row'):
+            take_nth_row = project_settings['take_nth_row']
+        else:
+            take_nth_row = 1
         X_abs_filepath = data_dir + '/' + clean_input_files[X_name]
-        X = pd.read_csv(X_abs_filepath, sep="\s+", engine='python', header=None)
+        X = pd.read_csv(X_abs_filepath, sep="\s+", engine='python', header=None, skiprows=lambda i: i % take_nth_row != 0)
+
 
         y_mat_file_path = data_dir + '/' + clean_input_files[y_name]
-        y_mat = pd.read_csv(y_mat_file_path, sep="\s+", engine='python', header=None)
+        y_mat = pd.read_csv(y_mat_file_path, sep="\s+", engine='python', header=None, skiprows= lambda i: i % take_nth_row != 0)
         y = y_mat.iloc[:, 0].tolist()
 
         data[dataset_name] = (X,y)
