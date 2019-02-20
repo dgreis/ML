@@ -100,25 +100,25 @@ class CrossValidator:
     def do_folds(self, data, model, num_folds, setting_name):
         X_train_val, y_train_val = data['train_val']
         kf = KFold(num_folds)
-        folds = list(kf.split(X_train_val,y_train_val))
+        folds_dict = dict(zip(range(num_folds),list(kf.split(X_train_val,y_train_val))))
         report_entries = pd.DataFrame()
         model_config = self.model_config
         project_settings = self.project_settings
+        model_config['folds_dict'] = folds_dict
         manager = Manager(model_config, project_settings)
-        f = 1
-        for fold in folds:
-            ind_dev, ind_val = fold[0], fold[1]
+        for f in range(num_folds):
+            ind_dev, ind_val = manager.return_fold_dev_val_ind(f)
             X_train,y_train = X_train_val.loc[ind_dev,:], pd.Series(y_train_val).loc[ind_dev].tolist()
             X_train_p, y_train_p = manager.fit_transform(X_train,y_train,'train')
             X_val,y_val = X_train_val.loc[ind_val,:], pd.Series(y_train_val).loc[ind_val].tolist()
             X_val_p, y_val_p = manager.transform(X_val, y_val, 'val')
             assert X_train_p.shape[1] == X_val_p.shape[1]
             assert len(y_val_p) == len(y_val)
-            if f == 1:
-                print("\tCV-fold (" + str(f) + "/" + str(num_folds) + ") data finalized. Training with " + str(len(X_train_p)) + " samples. Validation data with " +\
+            if f == 0:
+                print("\tCV-fold (" + str(f+1) + "/" + str(num_folds) + ") data finalized. Training with " + str(len(X_train_p)) + " samples. Validation data with " +\
                   str(len(X_val_p)) + " samples. Model with " + str(X_val_p.shape[1]) + " features. Now fitting model... ",end="")
             else:
-                print("\tCV-fold (" + str(f) +"/"+str(num_folds) + ") data finalized. Now fitting model... ",end="")
+                print("\tCV-fold (" + str(f+1) +"/"+str(num_folds) + ") data finalized. Now fitting model... ",end="")
             model.fit(X_train_p,y_train_p)
             print("Model Fit.")
             y_pred = model.predict(X_val_p)
