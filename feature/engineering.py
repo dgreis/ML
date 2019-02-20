@@ -715,11 +715,9 @@ class sample(HorizontalTransformer):
     def gen_new_column_names(self, touch_indices, prior_features):
         return prior_features
 
-
 class predict(Transformer):
 
     def __init__(self,model_config,project_settings):
-        #TODO: Review this logic
         super(predict, self).__init__(model_config, project_settings)
         predict_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
                         ['feature_engineering'])[0][self.manipulator_name]
@@ -729,6 +727,11 @@ class predict(Transformer):
             predict_entry['keyword_arg_settings'] = dict()
         if not predict_entry.has_key('other_options'):
             predict_entry['other_options'] = dict()
+        if not predict_entry.has_key('feature_settings'):
+            predict_entry['feature_settings'] = { 'select_before_eng' : False,  #TODO: import these as defaults from
+                                                  'feature_selection' : [],     #global_settings.yaml. Will require
+                                                  'feature_engineering' : []    #some yaml parsing logic, must be somewhere in
+                                                }                               #code already, to fill out config not def by user
         predict_entry['model_name'] = self.manipulator_name
         self.set_base_transformer(Wrapper(base_algo_class, predict_entry,project_settings))
         self.configure_features()

@@ -34,6 +34,7 @@ def main():
         entries = cv.perform_cross_validation(data, model)
         #averaged_entries = cv.average_entries(entries)
         report.add_entries_to_report(entries)
+        #TODO: Figure out 'remaining metrics' apply to regression. If not, this part could be skipped
         print "Next Step: estimate remaining metrics using validation set."
         X_train, y_train = manager.load_clean_datasets('train',project_settings)['train']
         X_train_p, y_train_p = manager.fit_transform(X_train,y_train,'train')
