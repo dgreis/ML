@@ -138,6 +138,12 @@ class Transformer(Manipulator):
             self.features = prior_features
         self.output_features()
 
+    def load_prior_features(self):
+        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
+        prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
+        prior_features = flip_dict(prior_inv_col_map)
+        return prior_features
+
     def fetch_transform_settings(self,model_config, transformer_name):
         feature_eng_settings = model_config['feature_settings']['feature_engineering']
         for item in feature_eng_settings:

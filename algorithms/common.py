@@ -8,10 +8,6 @@ class MetaModeler(Wrapper):
     def __init__(self, model_config, project_settings, mode='algorithm'):
         base_algo_class = PassThrough
         super(MetaModeler, self).__init__(base_algo_class, model_config, project_settings, mode)
-        prior_features = self.load_prior_features()
-        assert len(prior_features) == 1
-        last_feature = prior_features.values()[0]
-        assert last_feature[-10:] == '_metamodel'
 
 
 class PassThrough:
