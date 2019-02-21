@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Truncator, Deleter, Identity, \
-    Sampler, Stacker, OOSPredictorEns
+    Sampler, Stacker, OOSPredictorEns, MetaModeler
 from manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -137,12 +137,6 @@ class Transformer(Manipulator):
         else:
             self.features = prior_features
         self.output_features()
-
-    def load_prior_features(self):
-        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
-        prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
-        prior_features = flip_dict(prior_inv_col_map)
-        return prior_features
 
     def fetch_transform_settings(self,model_config, transformer_name):
         feature_eng_settings = model_config['feature_settings']['feature_engineering']
@@ -596,6 +590,30 @@ class kaggle_stack(Transformer):
             new_feature_names.append(new_feature_name)
         feature_names = [prior_features[i] for i in touch_indices]
         return feature_names + new_feature_names
+
+class metamodel(Transformer):
+
+    def __init__(self, model_config, project_settings):
+        super(metamodel, self).__init__(model_config, project_settings)
+        metamodel_settings = self.fetch_transform_settings(model_config, self.manipulator_name)
+        base_algorithm = metamodel_settings['base_algorithm']
+        self.base_algorithm = base_algorithm
+        keyword_arg_settings = metamodel_settings['keyword_arg_settings'] #TODO: Make defaults if no input provided
+        self.set_base_transformer(MetaModeler(base_algorithm,keyword_arg_settings))
+        self.configure_features()
+
+    def transform(self, X_touch, y_touch, **kwargs):
+        metamodel_transformer = self.base_transformer
+        col_loc = X_touch.columns.max() + 1
+        ow = X_touch.shape[1]
+        X_touch.loc[:,col_loc] = metamodel_transformer.fitted_base_algo.predict(X_touch)
+        assert X_touch.shape[1] > ow
+        return X_touch, y_touch
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        new_col_name = self.base_algorithm + '_metamodel'
+        feature_names = [prior_features[i] for i in touch_indices]
+        return feature_names + [new_col_name]
 
 class interpolate(Transformer):
     """Example in models.yaml file:

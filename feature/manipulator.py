@@ -5,7 +5,7 @@ import os
 
 from django.utils.text import slugify
 
-from utils import find_project_dir
+from utils import find_project_dir, load_inv_column_map, flip_dict
 
 
 class Manipulator(object):
@@ -51,6 +51,13 @@ class Manipulator(object):
             return True
         else:
             return False
+
+    def load_prior_features(self):
+        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
+        prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
+        prior_features = flip_dict(prior_inv_col_map)
+        return prior_features
+
 
     def det_prior_init_feature_names_filepath(self, model_config):
         raise NotImplementedError

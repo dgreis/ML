@@ -106,6 +106,22 @@ class LeaveOneOutEncoder:
             assert not pd.isnull(cat_means).any()
             return pd.DataFrame(cat_means,index=X_touch.index)
 
+class MetaModeler:
+
+    def __init__(self,base_algorithm, keyword_arg_settings):
+        self.base_algorithm = base_algorithm
+        self.keyword_arg_settings = keyword_arg_settings
+        self.fitted_base_algo = None
+
+
+    def fit(self,X_touch,y_touch):
+        base_algorithm_name = self.base_algorithm
+        keyword_arg_settings = self.keyword_arg_settings
+        base_algo_class = get_algo_class(base_algorithm_name)
+        base_algo_instance = base_algo_class(**keyword_arg_settings)
+        base_algo_instance.fit(X_touch,y_touch)
+        self.fitted_base_algo = base_algo_instance
+
 class OOSPredictorEns:
 
     def __init__(self,ens_algos, ens_algos_keyword_arg_settings_dict,folds_info):

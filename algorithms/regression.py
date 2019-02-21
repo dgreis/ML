@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from wrapper import Wrapper
+from wrapper import Wrapper, PassThrough
 from sklearn import ensemble
 from sklearn import tree
 from django.utils.text import slugify
@@ -46,6 +46,16 @@ class RandomForestRegressor(Wrapper):
         artifact_dir = self.artifact_dir
         model_name = self.model_name
         f.savefig(artifact_dir + '/' + slugify(model_name) + 'feature-importance-plot.pdf')
+
+class MetaModeler(Wrapper): #TODO: Can this be put in wrapper.py? So classification can also use it?
+
+    def __init__(self, model_config, project_settings, mode='algorithm'):
+        base_algo_class = PassThrough
+        super(MetaModeler, self).__init__(base_algo_class, model_config, project_settings, mode)
+        prior_features = self.load_prior_features()
+        assert len(prior_features) == 1
+        last_feature = prior_features.values()[0]
+        assert last_feature[-10:] == '_metamodel'
 
 class DecisionTreeRegressor(Wrapper):  ##TODO: Can this be taken out? Because it doesn't implement anything beyond OTB sklearn functionality?
 
