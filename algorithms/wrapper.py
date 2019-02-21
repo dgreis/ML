@@ -1,11 +1,9 @@
-import os
 
 import pandas as pd
-import numpy as np
 
 from feature.manipulator import Manipulator
 from django.utils.text import slugify
-from utils import find_project_dir, load_working_file_filepath, load_inv_column_map, load_clean_input_file_filepath
+from utils import load_clean_input_file_filepath
 
 class Wrapper(Manipulator):
 
@@ -80,14 +78,4 @@ class Wrapper(Manipulator):
     def set_features(self, working_features):
         setattr(self,'features', working_features)
 
-class PassThrough:
-    """Used for meta-modeling, when prediction already exists as a feature in the X matrix"""
-    def __init__(self):
-        pass
 
-    def fit(self,X,y):
-        assert X.shape[1] == 1
-
-    def predict(self,X):
-        assert X.shape[1] == 1
-        return np.array(X[0])
