@@ -15,8 +15,8 @@ class Manager:
     def return_fold_dev_val_ind(self,fold_num):
         model_config = self.model_config
         #TODO: If model will peek at validation set, implement logic here
-        folds_dict = model_config['folds_dict']
-        ind_dev, ind_val = folds_dict[fold_num]
+        folds_map = model_config['folds_map']
+        ind_dev, ind_val = folds_map[fold_num]
         return ind_dev, ind_val
 
     def fit_transform(self, X, y, dataset_name):

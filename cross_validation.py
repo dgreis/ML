@@ -99,14 +99,15 @@ class CrossValidator:
 
     def do_folds(self, data, model, num_folds, setting_name):
         X_train_val, y_train_val = data['train_val']
-        kf = KFold(num_folds)
-        folds_dict = dict(zip(range(num_folds),list(kf.split(X_train_val,y_train_val))))
+        kf = KFold(num_folds) #TODO: Make sure this shuffles the data when splitting
+        folds_map = dict(zip(range(num_folds),list(kf.split(X_train_val,y_train_val))))
         report_entries = pd.DataFrame()
         model_config = self.model_config
         project_settings = self.project_settings
-        model_config['folds_dict'] = folds_dict
+        model_config['folds_map'] = folds_map
         manager = Manager(model_config, project_settings)
         for f in range(num_folds):
+            model_config['fold_i'] = f
             ind_dev, ind_val = manager.return_fold_dev_val_ind(f)
             X_train,y_train = X_train_val.loc[ind_dev,:], pd.Series(y_train_val).loc[ind_dev].tolist()
             X_train_p, y_train_p = manager.fit_transform(X_train,y_train,'train')

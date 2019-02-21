@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Truncator, Deleter, Identity, \
-    Sampler, Stacker
+    Sampler, Stacker, OOSPredictorEns
 from manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -168,7 +168,7 @@ class Transformer(Manipulator):
         col_names = prior_features.values()
         inclusion_patterns = self.inclusion_patterns
         inv_working_features = flip_dict(prior_features)
-        if inclusion_patterns == ['All']:
+        if inclusion_patterns == ['All']:   #TODO: Handle this as a single string because I forget to make it a list in the yaml
             touch_indices = range(len(prior_features))
             untouched_indices = list()
         else:
@@ -394,7 +394,6 @@ class normalize(Transformer):
             Xt_feat_names.append(norm_feature_name)
         return Xt_feat_names
 
-
 class standard_scale(Transformer):
     """
     Models:
@@ -539,7 +538,7 @@ class ind_stack(Transformer):
     def __init__(self, model_config, project_settings):
         super(ind_stack, self).__init__(model_config, project_settings)
         ind_stack_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
-        ['feature_engineering'])[0][self.manipulator_name]
+        ['feature_engineering'])[0][self.manipulator_name] #TODO: Figure out if method fetch_transform_settings can do this?
         self.stacking_algorithm_name = ind_stack_entry['algorithm']
         self.configure_features()
         keyword_arg_settings = dict()
@@ -560,6 +559,43 @@ class ind_stack(Transformer):
         new_feature_name = stacking_algorithm_name + '.hat'
         feature_names = [prior_features[i] for i in touch_indices]
         return feature_names + [new_feature_name]
+
+#TODO: Consider sub-classing stacking methods off a super-class? Don't think this will work b/c kaggle_stack not a TC
+class kaggle_stack(Transformer):
+
+    def __init__(self, model_config, project_settings):
+        super(kaggle_stack, self).__init__(model_config, project_settings)
+        kaggle_stack_settings = self.fetch_transform_settings(model_config, self.manipulator_name)
+        algorithms = kaggle_stack_settings['algorithms']
+        ens_algos = list()
+        ens_algos_keyword_arg_dict = dict()
+        for algo in algorithms:
+            algo_name = algo.keys()[0]
+            algo_keyword_arg_settings = algo[algo_name]['keyword_arg_settings']
+            ens_algos.append(algo_name)
+            ens_algos_keyword_arg_dict[algo_name] = algo_keyword_arg_settings
+        self.ens_algos = ens_algos
+        folds_info = { 'folds_map' : model_config['folds_map'], 'fold_i': model_config['fold_i']}
+        self.set_base_transformer(OOSPredictorEns(ens_algos, ens_algos_keyword_arg_dict, folds_info))
+        self.configure_features()
+
+    def transform(self, X_touch, y_touch, dataset_name):
+        oospredens_instance = self.base_transformer
+        X_t = oospredens_instance.transform(X_touch, dataset_name)
+        ow = X_touch.shape[1]
+        X_t.columns = np.arange(ow,ow+X_t.shape[1],1)
+        X_touched = pd.concat([X_touch,X_t],axis=1)
+        assert X_touched.shape[1] == X_touch.shape[1] + X_t.shape[1]
+        return X_touched, y_touch
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        ens_algos = self.ens_algos
+        new_feature_names = list()
+        for algo in ens_algos:
+            new_feature_name = algo + '.hat'
+            new_feature_names.append(new_feature_name)
+        feature_names = [prior_features[i] for i in touch_indices]
+        return feature_names + new_feature_names
 
 class interpolate(Transformer):
     """Example in models.yaml file:
@@ -603,7 +639,6 @@ class interpolate(Transformer):
         old_feature_name = prior_features[touch_idx]
         new_feature_name = 'interp(' + old_feature_name + ')'
         return [new_feature_name]
-
 
 class as_numeric(TransformChain):
     """Example in models.yaml file:
