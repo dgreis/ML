@@ -496,7 +496,7 @@ class stack(TransformChain):
                              starting_transformations)
         expanded_transformations = list()
         transformer_names = [d.keys()[0] for d in starting_transformations]
-        t_idx = transformer_names.index('stack')
+        t_idx = transformer_names.index('stack') #TODO: Figure out whether next 3 lines uniquely identify stacking entry?
         i = 0
         stack_entry = filter(lambda x: x.keys()[0] == 'stack', starting_transformations)[0]['stack']
         algorithms = stack_entry['algorithms']
@@ -560,13 +560,77 @@ class ind_stack(Transformer):
         feature_names = [prior_features[i] for i in touch_indices]
         return feature_names + [new_feature_name]
 
-#TODO: Consider sub-classing stacking methods off a super-class? Don't think this will work b/c kaggle_stack not a TC
-class kaggle_stack(Transformer):
+class kaggle_stack(TransformChain):
+    """example in yaml.file
+  Model Name:
+    base_algorithm: algorithms.common.MetaModeler
+    feature_settings:
+      feature_engineering:
+        - kaggle_stack:
+            inclusion_patterns:
+              - 'All'
+            algorithms:
+              - sklearn.ensemble.RandomForestRegressor:
+                  keyword_arg_settings:
+                    random_state: 1234
+              - sklearn.ensemble.GradientBoostingRegressor:
+                  keyword_arg_settings:
+                    random_state: 1234
+    """
+    def __init__(self, starting_transformations, model_config, project_settings):
+        Manipulator.__init__(self, model_config, project_settings,
+                             starting_transformations)
+        expanded_transformations = list()
+        transformer_names = [d.keys()[0] for d in starting_transformations]
+        existing_include_feature_transformers = filter(lambda x: '.include_features' in x, transformer_names)
+        if len(existing_include_feature_transformers) == 0:
+            i = 0
+        else:
+            i = len(existing_include_feature_transformers)
+        t_idx = transformer_names.index('kaggle_stack') #TODO: Is There better way to do this? What if you have a TC that appears more than once?
+        kaggle_stack_entry = filter(lambda x: x.keys()[0] == 'kaggle_stack', starting_transformations)[0]['kaggle_stack']
+        algorithms = kaggle_stack_entry['algorithms']
+        derived_cols = [d.keys()[0] + '.hat' for d in algorithms]
+        oos_predictor_ensemble_entry = dict()
+        oos_predictor_ensemble_entry['oos_predictor_ensemble'] = {
+            'algorithms': algorithms,
+            'inclusion_patterns': ['All'],
+        }
+        expanded_transformations.append(oos_predictor_ensemble_entry)
+        include_meta_features_transformer_settings = dict()
+        include_meta_features_transformer_settings[str(i) + '.include_features'] = {
+            'inclusion_patterns' : derived_cols
+        }
+        i += 1
+        expanded_transformations.append(include_meta_features_transformer_settings)
+        metamodel_transformer_settings = dict()
+        metamodel_transformer_settings['metamodel'] = {
+            'base_algorithm': 'sklearn.linear_model.LinearRegression',
+            'keyword_arg_settings' : {},
+            'inclusion_patterns': derived_cols
+        }
+        expanded_transformations.append(metamodel_transformer_settings)
+        if t_idx == 0:
+            starting_transformations = expanded_transformations + starting_transformations[1:]
+            exp_idx = len(expanded_transformations)
+        elif t_idx < len(starting_transformations) - 1:
+            starting_transformations = starting_transformations[0:t_idx] + expanded_transformations + starting_transformations[t_idx + 1:]
+            exp_idx = len(starting_transformations[0:t_idx]) + len(expanded_transformations)
+        else:
+            starting_transformations = starting_transformations[:-1] + expanded_transformations
+            exp_idx = len(starting_transformations[:-1]) + len(expanded_transformations)
+        model_config['feature_settings']['feature_engineering'] = starting_transformations
+        super(kaggle_stack, self).__init__(starting_transformations[:exp_idx], model_config, project_settings)
 
+class oos_predictor_ensemble(Transformer):
+    """Utility class used by kaggle_stack
+
+    (Refer to kaggle_stack TC constructor for more info if this transform is ever explicitly specified by user)
+    """
     def __init__(self, model_config, project_settings):
-        super(kaggle_stack, self).__init__(model_config, project_settings)
-        kaggle_stack_settings = self.fetch_transform_settings(model_config, self.manipulator_name)
-        algorithms = kaggle_stack_settings['algorithms']
+        super(oos_predictor_ensemble, self).__init__(model_config, project_settings)
+        oos_predictor_ensemble_settings = self.fetch_transform_settings(model_config, self.manipulator_name)
+        algorithms = oos_predictor_ensemble_settings['algorithms']
         ens_algos = list()
         ens_algos_keyword_arg_dict = dict()
         for algo in algorithms:
@@ -598,7 +662,10 @@ class kaggle_stack(Transformer):
         return feature_names + new_feature_names
 
 class metamodel(Transformer):
+    """Utility class used by kaggle_stack
 
+    (Refer to kaggle_stack TC constructor for more info if this transform is ever explicitly specified by user)
+    """
     def __init__(self, model_config, project_settings):
         super(metamodel, self).__init__(model_config, project_settings)
         metamodel_settings = self.fetch_transform_settings(model_config, self.manipulator_name)
@@ -610,16 +677,12 @@ class metamodel(Transformer):
 
     def transform(self, X_touch, y_touch, **kwargs):
         metamodel_transformer = self.base_transformer
-        col_loc = X_touch.columns.max() + 1
-        ow = X_touch.shape[1]
-        X_touch.loc[:,col_loc] = metamodel_transformer.fitted_base_algo.predict(X_touch)
-        assert X_touch.shape[1] > ow
-        return X_touch, y_touch
+        X_touched = pd.DataFrame(metamodel_transformer.fitted_base_algo.predict(X_touch),index=X_touch.index)
+        return X_touched, y_touch
 
     def gen_new_column_names(self, touch_indices, prior_features):
         new_col_name = self.base_algorithm + '_metamodel'
-        feature_names = [prior_features[i] for i in touch_indices]
-        return feature_names + [new_col_name]
+        return [new_col_name]
 
 class interpolate(Transformer):
     """Example in models.yaml file:
