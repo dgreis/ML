@@ -56,7 +56,6 @@ class InvOneHotEncoder:
                     print '\t' + str(val) + " not in column for dataset:" + dataset_name + ". Possibly Tweak val_map in as_numeric transform"
         return pd.DataFrame(num_column,index=X_touch.index)
 
-
 class Interpolator(interp1d):
 
     def __init__(self,x,y,**kwargs):
@@ -64,7 +63,6 @@ class Interpolator(interp1d):
 
     def transform(self,x):
         return self(x)
-
 
 class LeaveOneOutEncoder:
 
@@ -124,15 +122,16 @@ class MetaModeler:
 
 class OOSPredictorEns:
 
-    def __init__(self,ens_algos, ens_algos_keyword_arg_settings_dict,folds_info):
+    def __init__(self,ens_algos, ens_algos_keyword_arg_settings_dict):
         self.ens_algos = ens_algos
         self.ens_algos_keyword_arg_settings_dict = ens_algos_keyword_arg_settings_dict
-        self.folds_info = folds_info
+        self.folds_info = None
         self.oos_fitted_ensemble = None
 
     def fit(self,X_touch, y_touch):
         oos_fitted_ensemble = dict()
         folds_info = self.folds_info
+        assert type(folds_info) != None
         current_fold = folds_info['fold_i']
         folds_map = folds_info['folds_map']
         excluded_indices = folds_map[current_fold][1]
@@ -199,6 +198,9 @@ class OOSPredictorEns:
         fold_dev_ind = folds_map_copy[fold_i][0]
         folds_map_copy[fold_i][0] = filter(lambda x: x not in excluded_indices, fold_dev_ind)
         return folds_map_copy
+
+    def set_folds_info(self,folds_info):
+        self.folds_info = folds_info
 
 class Stacker:
 

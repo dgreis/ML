@@ -20,6 +20,7 @@ class Manipulator(object):
             os.makedirs(artifact_dir)
         self.artifact_dir = artifact_dir
         self.features = None
+        self.validation_peeking = False
         if not self.is_manipulator_chain():
             if len(manipulations) > 0:
                 manipulator_names = [d.keys()[0] for d in manipulations]
@@ -101,6 +102,10 @@ class ManipulatorChain(Manipulator):
 
     def __init__(self, manipulations, model_config, project_settings):
         super(ManipulatorChain, self).__init__(model_config,project_settings, manipulations)
+        self.leak_enforcer = None
+
+    def set_leak_enforcer(self,leak_enforcer):
+        self.leak_enforcer = leak_enforcer
 
     def fit(self,X_mat,y):
         raise NotImplementedError

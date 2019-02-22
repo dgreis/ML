@@ -27,7 +27,6 @@ class TransformChain(ManipulatorChain):
         model_config['feature_settings']['order'] = 0
         engineering_module = importlib.import_module('feature.engineering')
         for transformation in starting_transformations:
-            engineering_module = importlib.import_module('feature.engineering')
             transformer_name = transformation.keys()[0].split('.')[-1:][0]
             transform_class = getattr(engineering_module, transformer_name)
             if transform_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
@@ -41,7 +40,7 @@ class TransformChain(ManipulatorChain):
                 transform_class = getattr(engineering_module, transformer_class_name)
                 transformer = transform_class(model_config, project_settings)
                 model_config['feature_settings']['order'] += 1
-                transformation[transformer_name]['initialized_transformer'] = transformer
+                transformation[transformer_name]['initialized_manipulator'] = transformer
                 updated_transformations = updated_transformations + [transformation]
         super(TransformChain,self).__init__(updated_transformations, model_config, project_settings)
         self.transformations = updated_transformations
@@ -55,9 +54,18 @@ class TransformChain(ManipulatorChain):
             i = 1
             for d in transformations:
                 transformer_name = d.keys()[0]
-                transformer = d[transformer_name]['initialized_transformer']
+                transformer = d[transformer_name]['initialized_manipulator']
                 transformer_class = transformer.__class__
                 if fit_transform:
+                    le = self.leak_enforcer
+                    leak_exists = le.check_for_leak(X_mat)
+                    leak_allowed = le.check_leak_allowed(transformer_name)
+                    if leak_exists:
+                        print "\t\tLeak found for manipulator: " + transformer_name
+                        if leak_allowed:
+                         print "\t\t\tLeak is allowed for " + transformer_name + ". CV Metrics will be invalid"
+                        else:
+                         X_mat, y = le.remove_leaking_indices(X_mat, y)
                     touch_cols = transformer.touch_indices
                     X_rel = X_mat.loc[:,touch_cols]
                     transformer.fit(X_rel, y)
@@ -639,9 +647,15 @@ class oos_predictor_ensemble(Transformer):
             ens_algos.append(algo_name)
             ens_algos_keyword_arg_dict[algo_name] = algo_keyword_arg_settings
         self.ens_algos = ens_algos
-        folds_info = { 'folds_map' : model_config['folds_map'], 'fold_i': model_config['fold_i']}
-        self.set_base_transformer(OOSPredictorEns(ens_algos, ens_algos_keyword_arg_dict, folds_info))
+        self.set_base_transformer(OOSPredictorEns(ens_algos, ens_algos_keyword_arg_dict))
         self.configure_features()
+
+    def fit(self, X_touch, y_touch):
+        model_config = self.model_config
+        folds_info = { 'folds_map' : model_config['folds_map'], 'fold_i': model_config['fold_i']}
+        oos_predictor_ensemble = self.base_transformer
+        oos_predictor_ensemble.set_folds_info(folds_info)
+        self.base_transformer.fit(X_touch,y_touch)
 
     def transform(self, X_touch, y_touch, dataset_name):
         oospredens_instance = self.base_transformer
