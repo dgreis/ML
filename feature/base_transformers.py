@@ -122,11 +122,12 @@ class MetaModeler:
 
 class OOSPredictorEns:
 
-    def __init__(self,ens_algos, ens_algos_keyword_arg_settings_dict):
+    def __init__(self, ens_algos, ens_algos_keyword_arg_settings_dict, validation_peeking):
         self.ens_algos = ens_algos
         self.ens_algos_keyword_arg_settings_dict = ens_algos_keyword_arg_settings_dict
         self.folds_info = None
         self.oos_fitted_ensemble = None
+        self.allow_peeking = validation_peeking
 
     def fit(self,X_touch, y_touch):
         oos_fitted_ensemble = dict()
@@ -134,15 +135,19 @@ class OOSPredictorEns:
         assert type(folds_info) != None
         current_fold = folds_info['fold_i']
         folds_map = folds_info['folds_map']
-        excluded_indices = folds_map[current_fold][1]
-        assert not pd.Series([i in X_touch.index for i in excluded_indices]).all() #Might need to revise this assertion
         num_folds = len(folds_map)
-        other_folds = filter(lambda x: x != current_fold, range(num_folds))
+        if not self.allow_peeking:
+            other_folds = filter(lambda x: x != current_fold, range(num_folds))
+            excluded_indices = folds_map[current_fold][1]
+        else:
+            other_folds = range(num_folds)
+            excluded_indices = list()
         folds_map_copy = dict(zip(folds_map.keys(),[list(v) for v in folds_map.copy().values()]))
         for fold_i in other_folds:
             oos_fitted_ensemble[fold_i] = dict()
             folds_map_copy = self.filter_excluded_indices(folds_map_copy,fold_i, excluded_indices)
-            assert len(folds_map_copy[fold_i][0]) < len(folds_map[fold_i][0])
+            if len(excluded_indices) > 0:
+                assert len(folds_map_copy[fold_i][0]) < len(folds_map[fold_i][0])
             ind_dev = folds_map_copy[fold_i][0]
             X_of = X_touch.ix[ind_dev,:]
             y_of = pd.Series(y_touch,index=X_touch.index).ix[ind_dev]

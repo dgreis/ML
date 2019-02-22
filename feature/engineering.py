@@ -52,6 +52,7 @@ class TransformChain(ManipulatorChain):
             X_transform, y_transform = X_mat, y
         else:
             i = 1
+            was_leak = False
             for d in transformations:
                 transformer_name = d.keys()[0]
                 transformer = d[transformer_name]['initialized_manipulator']
@@ -61,14 +62,17 @@ class TransformChain(ManipulatorChain):
                     leak_exists = le.check_for_leak(X_mat)
                     leak_allowed = le.check_leak_allowed(transformer_name)
                     if leak_exists:
-                        print "\t\tLeak found for manipulator: " + transformer_name
                         if leak_allowed:
-                         print "\t\t\tLeak is allowed for " + transformer_name + ". CV Metrics will be invalid"
+                            print "\t\tLeak is allowed for " + transformer_name + ". CV Metrics will be invalid"
+                            X_dev, y_dev = X_mat, y
                         else:
-                         X_mat, y = le.remove_leaking_indices(X_mat, y)
+                            #print "\t\tLeak found for manipulator: " + transformer_name +". Removing leaked indices . . ."
+                            X_dev, y_dev = le.remove_leaking_indices(X_mat, y)
+                    else:
+                        X_dev, y_dev = X_mat, y
                     touch_cols = transformer.touch_indices
-                    X_rel = X_mat.loc[:,touch_cols]
-                    transformer.fit(X_rel, y)
+                    X_rel = X_dev.loc[:,touch_cols]
+                    transformer.fit(X_rel, y_dev)
                 split_args = self._get_args(transformer_class, 'split')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], split_args)
                 spkwargs = dict()
@@ -94,6 +98,8 @@ class TransformChain(ManipulatorChain):
                         transformer.store_output(X_transform,output_dir=artifact_dir)
                 X_mat, y = X_transform, y_transform
                 i += 1
+            if was_leak:
+                X_transform, y_transform = le.remove_leaking_indices(X_transform, y_transform)
         return X_transform, y_transform
 
     def fit_transform(self,X_mat,y,dataset_name):
@@ -577,6 +583,7 @@ class kaggle_stack(TransformChain):
         - kaggle_stack:
             inclusion_patterns:
               - 'All'
+            validation_peeking: True/False
             algorithms:
               - sklearn.ensemble.RandomForestRegressor:
                   keyword_arg_settings:
@@ -603,6 +610,7 @@ class kaggle_stack(TransformChain):
         oos_predictor_ensemble_entry['oos_predictor_ensemble'] = {
             'algorithms': algorithms,
             'inclusion_patterns': ['All'],
+            'validation_peeking': kaggle_stack_entry['validation_peeking']
         }
         expanded_transformations.append(oos_predictor_ensemble_entry)
         include_meta_features_transformer_settings = dict()
@@ -647,7 +655,8 @@ class oos_predictor_ensemble(Transformer):
             ens_algos.append(algo_name)
             ens_algos_keyword_arg_dict[algo_name] = algo_keyword_arg_settings
         self.ens_algos = ens_algos
-        self.set_base_transformer(OOSPredictorEns(ens_algos, ens_algos_keyword_arg_dict))
+        self.validation_peeking = oos_predictor_ensemble_settings['validation_peeking']
+        self.set_base_transformer(OOSPredictorEns(ens_algos, ens_algos_keyword_arg_dict, self.validation_peeking))
         self.configure_features()
 
     def fit(self, X_touch, y_touch):

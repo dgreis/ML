@@ -97,10 +97,14 @@ class CrossValidator:
             winning_setting = score_df.loc[0, 'setting']
             return report_entries[report_entries['setting'] == winning_setting]
 
+    def gen_folds_map(self, X, y, num_folds):     #TODO: Make sure this shuffles the data when splitting
+        kf = KFold(num_folds)
+        folds_map = dict(zip(range(num_folds),list(kf.split(X,y))))
+        return folds_map
+
     def do_folds(self, data, model, num_folds, setting_name):
         X_train_val, y_train_val = data['train_val']
-        kf = KFold(num_folds) #TODO: Make sure this shuffles the data when splitting
-        folds_map = dict(zip(range(num_folds),list(kf.split(X_train_val,y_train_val))))
+        folds_map = self.gen_folds_map(X_train_val, y_train_val, num_folds)
         report_entries = pd.DataFrame()
         model_config = self.model_config
         project_settings = self.project_settings

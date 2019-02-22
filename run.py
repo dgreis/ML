@@ -30,18 +30,29 @@ def main():
         data = manager.load_clean_datasets('train_val',project_settings)
         model = models[model_name]
         cv = CrossValidator(model_config, project_settings)
-        print "Next Step: estimate generalization error for some metrics using CV"
-        entries = cv.perform_cross_validation(data, model)
-        #averaged_entries = cv.average_entries(entries)
-        report.add_entries_to_report(entries)
-        #TODO: Figure out 'remaining metrics' apply to regression. If not, this part could be skipped
+        num_cv_folds = project_settings['assessment']['cv_num_folds']
+        if num_cv_folds > 1:
+            print "Next Step: estimate generalization error for some metrics using CV"
+            entries = cv.perform_cross_validation(data, model)
+            report.add_entries_to_report(entries)
+        else:
+            print "CV folds set to less than 2. No CV performed"
+        #TODO: Figure out 'remaining metrics' apply to regression. If not, this part could be skipped. Answer: Yes, only regression
         print "Next Step: estimate remaining metrics using validation set."
-        X_train, y_train = manager.load_clean_datasets('train',project_settings)['train']
-        X_train_p, y_train_p = manager.fit_transform(X_train,y_train,'train')
+        X_train_val, y_train_val = manager.load_clean_datasets('train_val', project_settings)['train_val']
+        if num_cv_folds < 2:
+            folds_map = cv.gen_folds_map(X_train_val, y_train_val, 5)  #TODO: Maybe make me specify if I don't do CV
+            model_config['folds_map'] = folds_map
+            model_config['fold_i'] = 4
+        ind_dev, ind_val = manager.return_fold_dev_val_ind(model_config['fold_i'])
+        X_train, y_train = X_train_val.loc[ind_dev, :], pd.Series(y_train_val).loc[ind_dev].tolist()
+        X_train_p, y_train_p = manager.fit_transform(X_train, y_train, 'train')
         model.fit(X_train_p, y_train_p)
         print 'Model Fit. Next Step: Perform Model Evaluation'
-        X_val, y_val = manager.load_clean_datasets('val',project_settings)['val']
-        X_val_p, y_val_p = manager.transform(X_val,y_val, 'val')
+        X_val, y_val = X_train_val.loc[ind_val, :], pd.Series(y_train_val).loc[ind_val].tolist()
+        X_val_p, y_val_p = manager.transform(X_val, y_val, 'val')
+        assert X_train_p.shape[1] == X_val_p.shape[1]
+        assert len(y_val_p) == len(y_val)
         y_pred = model.predict(X_val_p)
         if model.gen_output_flag:
             model.gen_output()
