@@ -52,11 +52,10 @@ class Report:
                 cv_column_table_html = cv_column_table.to_html()
                 f.write('<h1>Cross-Validated Metrics</h1>')
                 f.write(cv_column_table_html)
-            else:
-                val_column_table = self.gen_column_table(report_entries, 'validation')
-                val_column_table_html = val_column_table.to_html()
-                f.write('<h1>Validation Set Metrics</h1>')
-                f.write(val_column_table_html)
+            val_column_table = self.gen_column_table(report_entries, 'validation')
+            val_column_table_html = val_column_table.to_html()
+            f.write('<h1>Validation Set Metrics</h1>')
+            f.write(val_column_table_html)
             if 'test' in report_entries['dataset_name'].values:
                 test_column_table = self.gen_column_table(report_entries, 'test')
                 test_column_table_html = test_column_table.to_html()
