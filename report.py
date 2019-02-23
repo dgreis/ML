@@ -24,26 +24,44 @@ class Report:
         assert len(new_report_entries) > len(report_entries)
         self.report_entries = new_report_entries
 
-    def write_report(self):
+    def gen_column_table(self, report_entries, dataset_name):
         project_settings = self.project_settings
+        eval_battery = load_evaluation_battery(project_settings)
+        mtlu = dict([(b, eval_battery[b]['metric_type']) for b in eval_battery.keys()])
+        report_entries['metric_type'] = report_entries['metric'].apply(lambda x: mtlu[x])
+        column_entries = report_entries[(report_entries['dataset_name'] == dataset_name) &
+                                        (report_entries['metric_type'] == 'column')]
+        column_table = column_entries[['metric', 'model_name', 'content']].pivot('metric', 'model_name', 'content')
+        column_table = column_table.rename_axis(None)
+        for col in column_table.columns:
+            column_table[col] = column_table[col].apply(lambda x: "%0.3f (+/-%0.03f)" % (x[0], x[1] * 2) #TODO: Why *2?
+                                if type(x) == tuple
+                                else "{0:1.3f}".format(x))
+        return column_table
+
+    def write_report(self): #TODO: Adapt this for classification val/test output. Now only suited to regression/col metrics
+        project_settings = self.project_settings
+        report_entries = self.report_entries
         abs_project_dir = find_project_dir(project_settings)
         eval_dir = abs_project_dir + '/evaluation'
         if not os.path.isdir(eval_dir):
             os.makedirs(eval_dir)
         with open(eval_dir + '/report.html',"w") as f:
-            eval_battery = load_evaluation_battery(project_settings)
-            mtlu = dict([(b, eval_battery[b]['metric_type']) for b in eval_battery.keys()])
-            report_entries = self.report_entries
-            report_entries['metric_type'] = report_entries['metric'].apply(lambda x: mtlu[x])
-            column_entries = report_entries[(report_entries['dataset_name'] == 'cross_validation') &
-                                            (report_entries['metric_type'] == 'column')]
-            column_table = column_entries[['metric','model_name','content']].pivot('metric','model_name','content')
-            column_table = column_table.rename_axis(None)
-            for col in column_table.columns:
-                column_table[col] = column_table[col].apply(lambda x: "%0.3f (+/-%0.03f)" % (x[0], x[1] * 2))
-            column_table_html = column_table.to_html()
-            f.write('<h1>Cross-Validated Metrics</h1>')
-            f.write(column_table_html)
+            cv_column_table = self.gen_column_table(report_entries, 'cross_validation')
+            if len(cv_column_table) > 0:
+                cv_column_table_html = cv_column_table.to_html()
+                f.write('<h1>Cross-Validated Metrics</h1>')
+                f.write(cv_column_table_html)
+            else:
+                val_column_table = self.gen_column_table(report_entries, 'validation')
+                val_column_table_html = val_column_table.to_html()
+                f.write('<h1>Validation Set Metrics</h1>')
+                f.write(val_column_table_html)
+            if 'test' in report_entries['dataset_name'].values:
+                test_column_table = self.gen_column_table(report_entries, 'test')
+                test_column_table_html = test_column_table.to_html()
+                f.write('<h1>Test Set Metrics</h1>')
+                f.write(test_column_table_html)
             array_entries = report_entries[(report_entries['dataset_name'] == 'validation') &
                                             (report_entries['metric_type'] == 'array')].reset_index(drop=True)
             array_metric_names = array_entries['metric'].unique().tolist()

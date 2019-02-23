@@ -1,3 +1,5 @@
+import fractions
+
 from utils import *
 from evaluation import *
 from cross_validation import *
@@ -30,8 +32,8 @@ def main():
         data = manager.load_clean_datasets('train_val',project_settings)
         model = models[model_name]
         cv = CrossValidator(model_config, project_settings)
-        num_cv_folds = project_settings['assessment']['cv_num_folds']
-        if num_cv_folds > 1:
+        cv_num_folds = det_num_cv_folds(model_config, project_settings)
+        if cv_num_folds > 1:
             print "Next Step: estimate generalization error for some metrics using CV"
             entries = cv.perform_cross_validation(data, model)
             report.add_entries_to_report(entries)
@@ -40,10 +42,12 @@ def main():
         #TODO: Figure out 'remaining metrics' apply to regression. If not, this part could be skipped. Answer: Yes, only regression
         print "Next Step: estimate remaining metrics using validation set."
         X_train_val, y_train_val = manager.load_clean_datasets('train_val', project_settings)['train_val']
-        if num_cv_folds < 2:
-            folds_map = cv.gen_folds_map(X_train_val, y_train_val, 5)  #TODO: Maybe make me specify if I don't do CV
+        if cv_num_folds < 2:
+            implied_folds = fractions.Fraction.from_float(model_config['train_val_split']).limit_denominator(10).denominator
+            assert implied_folds <= 10
+            folds_map = cv.gen_folds_map(X_train_val, y_train_val, implied_folds)  #TODO: Maybe make me specify if I don't do CV
             model_config['folds_map'] = folds_map
-            model_config['fold_i'] = 4
+            model_config['fold_i'] = implied_folds - 1
         ind_dev, ind_val = manager.return_fold_dev_val_ind(model_config['fold_i'])
         X_train, y_train = X_train_val.loc[ind_dev, :], pd.Series(y_train_val).loc[ind_dev].tolist()
         X_train_p, y_train_p = manager.fit_transform(X_train, y_train, 'train')
@@ -57,9 +61,9 @@ def main():
         if model.gen_output_flag:
             model.gen_output()
         evaluation_battery = load_evaluation_battery(project_settings)
-        non_cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] != 'column'}
+        #non_cv_battery = {k: v for k, v in evaluation_battery.items() if evaluation_battery[k]['metric_type'] != 'column'}
         report_row = dict()
-        for metric_name in non_cv_battery:
+        for metric_name in evaluation_battery:
             report_row['dataset_name'] = 'validation'
             report_row['model_name'] = model_config['model_name']
             if hasattr(cv,'optimal_hyperparams'):
@@ -67,8 +71,8 @@ def main():
             else:
                 report_row['setting'] = 'default'
             report_row['metric'] = metric_name
-            metric_class = non_cv_battery[metric_name]['class']
-            kwargs = non_cv_battery[metric_name]['kwargs']
+            metric_class = evaluation_battery[metric_name]['class']
+            kwargs = evaluation_battery[metric_name]['kwargs']
             try:
                 content = metric_class(y_pred, y_val,**kwargs)
             except ValueError:
@@ -79,8 +83,9 @@ def main():
             #TODO: implement this
             X_test,y_test = manager.load_clean_datasets('test',project_settings)['test']
             X_test_p,y_test_p = manager.transform(X_test,y_test,'test')
+            assert y_test == y_test_p
             y_pred = model.predict(X_test_p)
-            for metric_name in non_cv_battery:
+            for metric_name in evaluation_battery:
                 report_row['dataset_name'] = 'test'
                 report_row['model_name'] = model_config['model_name']
                 if hasattr(cv, 'optimal_hyperparams'):
@@ -88,12 +93,12 @@ def main():
                 else:
                     report_row['setting'] = 'default'
                 report_row['metric'] = metric_name
-                metric_class = non_cv_battery[metric_name]['class']
-                kwargs = non_cv_battery[metric_name]['kwargs']
-                try:
-                    content = metric_class(y_pred, y_val, **kwargs)
-                except ValueError:
-                    content = np.nan
+                metric_class = evaluation_battery[metric_name]['class']
+                kwargs = evaluation_battery[metric_name]['kwargs']
+                #try: next line was indented
+                content = metric_class(y_pred, y_test_p, **kwargs)
+                #except ValueError:
+                #    content = np.nan
                 report_row['content'] = content
                 report.add_entries_to_report(report_row)
         i += 1

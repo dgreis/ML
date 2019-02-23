@@ -98,3 +98,20 @@ def load_clean_input_file_filepath(project_settings, data_ref):
     data_dir = find_data_dir(project_settings)
     cif_abs_filepath = data_dir + '/' + cif_rel_filepath
     return cif_abs_filepath
+
+def det_num_cv_folds(model_config, project_settings):
+    if model_config.has_key('cv_num_folds'):
+        if model_config['cv_num_folds'] < 2:
+            try:
+                assert model_config.has_key('train_val_split')
+            except AssertionError:
+                print "If not performing CV please specify train/val split with 'train_val_split' in yaml"
+                raise Exception
+            #train_val_split = model_config['train_val_split']
+            #implied_folds = float.as_integer_ratio(train_val_split)[1]
+            #assert implied_folds <= 10
+            #return implied_folds
+        else:
+            return model_config['cv_num_folds']
+    else:
+        return project_settings['assessment']['cv_num_folds']

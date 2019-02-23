@@ -63,7 +63,8 @@ class TransformChain(ManipulatorChain):
                     leak_allowed = le.check_leak_allowed(transformer_name)
                     if leak_exists:
                         if leak_allowed:
-                            print "\t\tLeak is allowed for " + transformer_name + ". CV Metrics will be invalid"
+                            #TODO: output print statements like this to log file to have record somewhere
+                            #print "\t\tLeak is allowed for " + transformer_name + ". CV Metrics will be invalid"
                             X_dev, y_dev = X_mat, y
                         else:
                             #print "\t\tLeak found for manipulator: " + transformer_name +". Removing leaked indices . . ."
