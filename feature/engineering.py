@@ -348,7 +348,7 @@ class HorizontalTransformer(Transformer):
     def combine(self,X_touched,X_untouched,y_touched,y_untouched,dataset_name):
         "This is a vertical combine instead of the default horizontal"
         if dataset_name == "train":
-            X_transform = X_untouched.append(X_touched,ignore_index=True)
+            X_transform = X_untouched.append(X_touched,ignore_index=False)
             y_transform = y_touched + y_untouched
             return X_transform, y_transform
         else:
