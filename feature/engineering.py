@@ -372,7 +372,7 @@ class basis_expansion(Transformer):
     def __init__(self, model_config, project_settings):
         super(basis_expansion, self).__init__(model_config, project_settings)
         self.set_base_transformer(PolynomialFeatures(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         tuples = list()
@@ -478,7 +478,7 @@ class normalize(Transformer):
     def __init__(self, model_config, project_settings):
         super(normalize, self).__init__(model_config, project_settings )
         self.set_base_transformer(Normalizer(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
         pass
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
