@@ -12,6 +12,7 @@ from algorithms.algoutils import configure_algorithms
 global_settings = yaml.load(open('./global_settings.yaml'))
 project_settings = configure_project_settings(global_settings)
 
+#TODO: some sort of clean-up of feature files so that program doesn't mistakenly use from past runs
 def main():
     if not all_clean_input_files_exist(project_settings):
         prep_data = importlib.import_module('projects.' + project_settings['project_name'] + '.src.' + 'prep_data')
