@@ -71,6 +71,7 @@ class TransformChain(ManipulatorChain):
                             X_dev, y_dev = le.remove_leaking_indices(X_mat, y)
                     else:
                         X_dev, y_dev = X_mat, y
+                    transformer.configure_features()
                     touch_cols = transformer.touch_indices
                     X_rel = X_dev.loc[:,touch_cols]
                     transformer.fit(X_rel, y_dev)
@@ -124,6 +125,8 @@ class Transformer(Manipulator):
         else:
             self.store = False
         self.inclusion_patterns = transformer_settings['inclusion_patterns']
+        self.exclusion_flag = False
+        self.creates_numeric_column = True
 
     def det_prior_init_feature_names_filepath(self, model_config):
         project_settings = self.project_settings
@@ -141,17 +144,84 @@ class Transformer(Manipulator):
 
     def configure_features(self):
         prior_features = self.load_prior_features()
-        touch_cols, untouched_cols = self.det_relevant_cols(prior_features)
-        self.touch_indices = touch_cols
-        self.untouched_indices = untouched_cols
-        touch_cols = self.touch_indices
+        touch_indices, untouched_indices = self.det_relevant_cols(prior_features)
+        try:
+            assert len(touch_indices) > 0 #This check might be redundant with the one in the Transformer.fit() method
+        except AssertionError:
+            print "Warning: " + self.manipulator_name + " is about touch 0 relevant columns."
+        self.touch_indices = touch_indices
+        self.untouched_indices = untouched_indices
         if not isinstance(self, HorizontalTransformer):
-            new_features = self.gen_new_column_names(touch_cols, prior_features)
+            new_features = self.gen_new_column_names(touch_indices, prior_features)
             new_feature_set = self.reindex(prior_features, new_features)
+            self.update_inclusion_patterns(prior_features)
             self.features = new_feature_set
+            if self.creates_numeric_column:
+                self.update_model_numeric_columns(prior_features, new_features)
         else:
             self.features = prior_features
         self.output_features()
+
+    def update_inclusion_patterns(self,prior_features):
+        inclusion_patterns = self.inclusion_patterns
+        if inclusion_patterns in ['All', ['All']]:
+            updated_inclusion_patterns = prior_features.values()
+        else:
+            if type(inclusion_patterns) == dict:
+                assert inclusion_patterns.keys() == ['All But']
+                updated_inclusion_patterns = inclusion_patterns['All But']
+            elif inclusion_patterns == "All Numeric":
+                model_config = self.model_config
+                assert model_config.has_key('numeric_features')
+                #Below filters to any numeric features that haven't already been filtered
+                updated_inclusion_patterns = filter(lambda x: x in model_config['numeric_features'], prior_features.values())
+                try:
+                    assert len(updated_inclusion_patterns) > 0
+                except AssertionError:
+                    print self.manipulator_name + " tries to get all numeric features but none exist at run-time"
+                    raise Exception
+            elif type(inclusion_patterns) == list:
+                updated_inclusion_patterns = inclusion_patterns
+            else:
+                raise Exception
+        self.inclusion_patterns = updated_inclusion_patterns
+
+    def check_if_derived_column_is_numeric(self,derived_column):
+        original_numeric_columns = self.project_settings['numeric_features']
+        for onc in original_numeric_columns:
+            if onc in derived_column:
+                return True
+            else:
+                pass
+        return False
+
+    def get_base_column_name(self,derived_column):
+        base_column_components = derived_column.split('(')[1:]
+        if len(base_column_components) == 1:
+            base_column_name = base_column_components[0].strip(')')
+        else:
+            base_column_name = ('(').join(base_column_components)[:-1]
+        return base_column_name
+
+    def update_model_numeric_columns(self, prior_features, potential_new_numeric_features):
+        model_config = self.model_config
+        if model_config.has_key('numeric_features'):
+            existing_numeric_features = model_config['numeric_features']
+            persisting_numeric_features = set(existing_numeric_features).intersection(set(prior_features.values()))
+            for nnf in potential_new_numeric_features:
+                if self.check_if_derived_column_is_numeric(nnf):
+                    persisting_numeric_features.update([nnf])
+                    bc = self.get_base_column_name(nnf)
+                    if nnf == bc:
+                        pass
+                    else:
+                        persisting_numeric_features.discard(bc)
+                else:
+                    pass
+            updated_numeric_features = list(persisting_numeric_features)
+            self.model_config['numeric_features'] = updated_numeric_features
+        else:
+            pass
 
     def load_prior_features(self):
         prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
@@ -172,6 +242,14 @@ class Transformer(Manipulator):
         self.base_transformer = transformer_instance
 
     def fit(self, X_mat, y, **kwargs):
+        prior_features = self.load_prior_features()
+        inclusion_patterns = self.inclusion_patterns
+        try:
+            # Check that all columns due to be touched are in inclusion patterns
+            assert pd.Series([pattern in prior_features.values() for pattern in inclusion_patterns ]).all()
+        except AssertionError:
+            print "inclusion patterns of " + self.manipulator_name + " don't exist in data at runtime. Please remove and re-run"
+            raise Exception
         self.base_transformer.fit(X_mat, y)
 
     def det_relevant_cols(self, prior_features, exclusion_flag=False):
@@ -192,15 +270,17 @@ class Transformer(Manipulator):
                 exclusion_flag = True
                 inclusion_patterns = inclusion_patterns['All But']
             elif inclusion_patterns == "All Numeric":
-                project_settings = self.project_settings
-                assert project_settings.has_key('numeric_features')
-                inclusion_patterns = project_settings['numeric_features']
+                model_config = self.model_config
+                assert model_config.has_key('numeric_features')
+                inclusion_patterns = model_config['numeric_features']
             for pattern in inclusion_patterns:
-                len_pat = len(pattern)
-                pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
+                #len_pat = len(pattern)
+                pattern_begin_cols = filter(lambda x: x == pattern, col_names)
                 include_columns = include_columns + pattern_begin_cols
-            non_inter_include_columns = filter(lambda x: 'x%x' not in x, include_columns)
-            touch_indices = [int(inv_working_features[col_name]) for col_name in non_inter_include_columns]
+            #non_inter_include_columns = filter(lambda x: 'x%x' not in x, include_columns)
+            #touch_indices = [int(inv_working_features[col_name]) for col_name in non_inter_include_columns]
+            #Why did I filter out interaction columns before?
+            touch_indices = [int(inv_working_features[col_name]) for col_name in include_columns]
             untouched_indices = list(set(col_indices).difference(set(touch_indices)))
         if exclusion_flag:
             return untouched_indices, touch_indices
@@ -426,7 +506,7 @@ class standard_scale(Transformer):
     def __init__(self, model_config, project_settings):
         super(standard_scale, self).__init__(model_config, project_settings )
         self.set_base_transformer(StandardScaler(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         Xt_feat_names = list()
@@ -452,7 +532,7 @@ class pca(Transformer):
     def __init__(self, model_config, project_settings):
         super(pca, self).__init__(model_config, project_settings )
         self.set_base_transformer(PCA(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         num_comps = self.base_transformer.n_components
@@ -475,7 +555,7 @@ class loo_encoding(Transformer):
     def __init__(self, model_config, project_settings):
         super(loo_encoding, self).__init__(model_config, project_settings )
         self.set_base_transformer(LeaveOneOutEncoder(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
 
     def transform(self, X_touch, y_touch, dataset_name):
         return self.base_transformer.transform(X_touch, dataset_name), y_touch
@@ -555,7 +635,7 @@ class ind_stack(Transformer):
         ind_stack_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
         ['feature_engineering'])[0][self.manipulator_name] #TODO: Figure out if method fetch_transform_settings can do this?
         self.stacking_algorithm_name = ind_stack_entry['algorithm']
-        self.configure_features()
+        #self.configure_features()
         keyword_arg_settings = dict()
         if ind_stack_entry.has_key('keyword_arg_settings'):
             keyword_arg_settings = ind_stack_entry['keyword_arg_settings']
@@ -658,7 +738,7 @@ class oos_predictor_ensemble(Transformer):
         self.ens_algos = ens_algos
         self.validation_peeking = oos_predictor_ensemble_settings['validation_peeking']
         self.set_base_transformer(OOSPredictorEns(ens_algos, ens_algos_keyword_arg_dict, self.validation_peeking))
-        self.configure_features()
+        #self.configure_features()
 
     def fit(self, X_touch, y_touch):
         model_config = self.model_config
@@ -697,7 +777,7 @@ class metamodel(Transformer):
         self.base_algorithm = base_algorithm
         keyword_arg_settings = metamodel_settings['keyword_arg_settings'] #TODO: Make defaults if no input provided
         self.set_base_transformer(MetaModeler(base_algorithm,keyword_arg_settings))
-        self.configure_features()
+        #self.configure_features()
 
     def transform(self, X_touch, y_touch, **kwargs):
         metamodel_transformer = self.base_transformer
@@ -724,7 +804,7 @@ class interpolate(Transformer):
     def __init__(self, model_config, project_settings):
         super(interpolate, self).__init__(model_config, project_settings)
         self.set_base_transformer(None)
-        self.configure_features()
+        #self.configure_features()
 
     def fit(self, X_mat, y):
         kwargs = self.kwargs
@@ -799,13 +879,14 @@ class as_numeric(TransformChain):
         model_config['feature_settings']['feature_engineering'] = transformations
         super(as_numeric, self).__init__(transformations[:exp_idx], model_config, project_settings)
 
+#TODO: handle numeric_features here. It needs to flip from non to yes
 class ind_as_numeric(Transformer):
     """
     This is a utility transformation, used by as_numeric transformchain transformer
     """
     def __init__(self,model_config, project_settings):
         super(ind_as_numeric, self).__init__(model_config, project_settings)
-        self.configure_features()
+        #self.configure_features()
         ind_as_numeric_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
                         ['feature_engineering'])[0][self.manipulator_name]
         kwargs = dict()
@@ -839,7 +920,7 @@ class sample(HorizontalTransformer):
     def __init__(self,model_config,project_settings):
         super(sample, self).__init__(model_config, project_settings )
         self.set_base_transformer(Sampler(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
 
     def fit(self, X_mat, y):
         X_mat_idx = X_mat.index.tolist()
@@ -880,7 +961,7 @@ class predict(Transformer):
                                                 }                               #code already, to fill out config not def by user
         predict_entry['model_name'] = self.manipulator_name
         self.set_base_transformer(Wrapper(base_algo_class, predict_entry,project_settings))
-        self.configure_features()
+        #self.configure_features()
 
     def gen_new_column_names(self, touch_indices, prior_features):
         new_col_name = self.manipulator_name + '_hat'
@@ -900,7 +981,7 @@ class reset_data(Transformer):
     def __init__(self,model_config,project_settings):
         super(reset_data, self).__init__(model_config, project_settings )
         self.set_base_transformer(Identity(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
 
     def gen_new_column_names(self, touch_indices, prior_features):
         project_settings = self.project_settings
@@ -925,7 +1006,7 @@ class exclude_features(Transformer):
     """
     def __init__(self, model_config, project_settings):
         super(exclude_features, self).__init__(model_config, project_settings)
-        self.configure_features()
+        #self.configure_features()
         self.set_base_transformer(Deleter(**self.kwargs))
 
     def gen_new_column_names(self, touch_indices, prior_features):
@@ -946,7 +1027,7 @@ class include_features(Transformer):
     def __init__(self, model_config, project_settings):
         super(include_features, self).__init__(model_config, project_settings)
         setattr(self,'exclusion_flag',True)
-        self.configure_features()
+        #self.configure_features()
         self.set_base_transformer(Deleter(**self.kwargs))
 
     def gen_new_column_names(self, touch_indices, prior_features):
@@ -988,7 +1069,7 @@ class ind_drop_outliers(HorizontalTransformer):
     def __init__(self, model_config, project_settings):
         super(ind_drop_outliers, self).__init__(model_config, project_settings)
         self.set_base_transformer(Truncator(**self.kwargs))
-        self.configure_features()
+        #self.configure_features()
 
     def fit(self, X_col, y):
         X_mat_idx = X_col.index.tolist()

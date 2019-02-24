@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import copy
 import pandas as pd
 import numpy as np
 
@@ -144,6 +145,9 @@ class CrossValidator:
                     content = np.nan
                 report_row['content'] = content
                 report_entries = report_entries.append(report_row,ignore_index=True)
+            manager = Manager(model_config, project_settings)
+            if model_config.has_key('numeric_features'):
+                model_config['numeric_features'] = copy.copy(project_settings['numeric_features'])
             f += 1
         return report_entries
 
