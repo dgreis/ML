@@ -44,7 +44,7 @@ class Manipulator(object):
                 pass
 
     def is_manipulator_chain(self):
-        #TODO: Find a better way to do this
+        #TODO: Find a better way to do this, using issubclass
         manipulator_module = importlib.import_module('feature.manipulator')
         if self.__class__.__bases__[0] == getattr(manipulator_module,'ManipulatorChain'):
             return True

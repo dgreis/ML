@@ -262,7 +262,7 @@ class Transformer(Manipulator):
         col_names = prior_features.values()
         inclusion_patterns = self.inclusion_patterns
         inv_working_features = flip_dict(prior_features)
-        if inclusion_patterns == ['All']:   #TODO: Handle this as a single string because I forget to make it a list in the yaml
+        if inclusion_patterns in ['All',['All']]:
             touch_indices = range(len(prior_features))
             untouched_indices = list()
         else:
