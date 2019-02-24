@@ -18,40 +18,45 @@ from sklearn.feature_selection import f_regression
 
 class FilterChain(ManipulatorChain):
 
-    def __init__(self,filters, model_config, project_settings):
-        ManipulatorChain.__init__(self, filters, model_config, project_settings)
-        self.filters = filters
+    def __init__(self, filter_list, model_config, project_settings):
+        model_config['feature_settings']['order'] = 0
+        selection_module = importlib.import_module('feature.selection')
+        initialized_filters = list()
+        for entry in filter_list:
+            filter_name = entry.keys()[0]
+            filter_class = getattr(selection_module, filter_name)
+            filter_instance = filter_class(model_config, project_settings)
+            model_config['feature_settings']['order'] += 1
+            entry[filter_name]['initialized_manipulator'] = filter_instance
+            initialized_filters = initialized_filters + [entry]
+        super(FilterChain,self).__init__(initialized_filters, model_config, project_settings)
+        self.filters = initialized_filters
 
     def fit_transform(self,X_mat,y,dataset_name):
         """To be fit method of filter_chain class"""
-        selection_module = importlib.import_module('feature.selection')
         filters = self.filters
-        model_config = self.model_config
-        model_config['feature_settings']['order'] = 0
-        project_settings = self.project_settings
+        selection_module = importlib.import_module('feature.selection')
         X_filt, y_filt = X_mat, y
         i = 1
         if len(filters) < 1:
             pass
         else:
-            for d in filters:
-                filter_name = d.keys()[0]
+            for entry in filters:
                 #print "\t[" + dataset_name + "] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
-                filter_class = getattr(selection_module,filter_name)
+                filter_name = entry.keys()[0]
+                filter_class = getattr(selection_module, filter_name)
                 fit_args = self._get_args(filter_class, 'fit')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], fit_args)
-                filter_instance = filter_class(model_config,project_settings)
-                model_config['feature_settings']['order'] += 1
                 kwargs = dict()
                 for arg in additional_args:
                     kwargs[arg] = getattr(self,arg)
+                filter_instance = entry[filter_name]['initialized_manipulator']
                 filter_instance.fit(X_filt,y_filt,**kwargs)
                 features = filter_instance.features
                 reindexed_features = filter_instance.reindex(features)
                 #filter_instance.features = reindexed_features
                 setattr(filter_instance,'features',reindexed_features)
                 filter_instance.output_features()
-                d[filter_name]['initialized_filter'] = filter_instance
                 _, X_filt, y_filt, _ = filter_instance.split(X_filt, y)
                 assert True not in pd.isnull(X_filt).any(1).value_counts() #TODO: pandas dependent
                 X_filt.columns = filter_instance.features.keys()
@@ -84,7 +89,7 @@ class FilterChain(ManipulatorChain):
     def _fetch_initialized_filter(self,entry):
         assert len(entry.keys()) == 1
         key = entry.keys()[0]
-        return entry[key]['initialized_filter']
+        return entry[key]['initialized_manipulator']
 
 class Filter(Manipulator):
 
