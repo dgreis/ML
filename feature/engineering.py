@@ -19,6 +19,7 @@ from sklearn.decomposition import PCA
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from django.utils.text import slugify
+from collections import OrderedDict
 
 class TransformChain(ManipulatorChain):
 
@@ -374,28 +375,33 @@ class basis_expansion(Transformer):
         self.set_base_transformer(PolynomialFeatures(**self.kwargs))
         #self.configure_features()
 
-    def gen_new_column_names(self, orig_tcol_idx, working_features):
+    def gen_new_column_names(self, touch_indices, prior_features):
         tuples = list()
-        for i in range(len(orig_tcol_idx)):
-            b = orig_tcol_idx[i]
-            rem_list = orig_tcol_idx[i:]
-            t = [(working_features[b],working_features[r_i]) for r_i in rem_list]
+        for i in range(len(touch_indices)):
+            b = touch_indices[i]
+            rem_list = touch_indices[i:]
+            t = [(prior_features[b], prior_features[r_i]) for r_i in rem_list]
             tuples = tuples + t
         stiched_feature_names = [self.stich(x) for x in tuples]
-        orig_tcol_names = [working_features[idx] for idx in orig_tcol_idx]
+        orig_tcol_names = [prior_features[idx] for idx in touch_indices]
         Xt_feat_names = orig_tcol_names + stiched_feature_names
         if getattr(self.base_transformer,'include_bias'):
-            Xt_feat_names = ['bias'] + Xt_feat_names
+            Xt_feat_names = ['bias'] + Xt_feat_names #TODO: make this bias term uniquely named, i.e. the manipulator name?
         if getattr(self.base_transformer,'interaction_only'):
             Xt_feat_names = filter(lambda x: '**' not in x, Xt_feat_names)
         return Xt_feat_names
 
+    def fit(self,X,y):
+        assert X.shape[1] < 3 #If more than this, something is most likely wrong
+        self.base_transformer.fit(X,y)
 
     def stich(self,tuple):
         if tuple[0] == tuple[1]:
             return "(" + tuple[0] + ')**2'
+        #else:
+        #    return 'inter(' + tuple[0] + 'x%x' + tuple[1] + ')'
         else:
-            return 'inter(' + tuple[0] + 'x%x' + tuple[1] + ')'
+            raise Exception
 
 class interaction_terms(TransformChain):
     """
@@ -417,33 +423,14 @@ class interaction_terms(TransformChain):
         expanded_transformations = list()
         transformer_names = [d.keys()[0] for d in transformations]
         t_idx = transformer_names.index('interaction_terms')
-        if t_idx == 0:
-            if model_config['feature_settings']['select_before_eng']:
-                print "Interaction terms are meant to be run before model selection methods. Turn off select_before_eng flag"
-                raise Exception
-            prior_transform_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-        else:
-            prior_transform = transformer_names[t_idx - 1]
-            prior_transform_feature_names_filepath = self._det_output_features_filepath(prior_transform)
-        inv_column_map = load_inv_column_map(prior_transform_feature_names_filepath)
-        feature_names = inv_column_map.keys()
         i = 0
         for tuple in compact_interactions:
             t0 = tuple[0]
             t1 = tuple[1]
-            # #TODO: Make this check work for categorical variables
-            # if False in [x in feature_names for x in (t0,t1)]:
-            #     print "Expected columns not present in data to do interaction. Check that they have not been transformed previously"
-            #     raise Exception
-            #     #TODO: move exception message inside Exception to be more informative.
-            len_t0_str = len(t0)
-            len_t1_str = len(t1)
-            t0_col_vals = filter(lambda x: x[0:len_t0_str] == t0 , feature_names)
-            t1_col_vals = filter(lambda x: x[0:len_t1_str] == t1 , feature_names)
-            expanded_interactions = list(itertools.product(t0_col_vals ,t1_col_vals))
+            expanded_interactions = list(itertools.product([t0],[t1]))
             for inter in expanded_interactions:
                 transformation_dict = dict()
-                transformation_dict['int' + str(i) + '.' + 'basis_expansion'] = {
+                transformation_dict['int' + str(i) + '.' + 'ind_interaction_terms'] = {
                     'inclusion_patterns':[inter[0], inter[1]],
                     'kwargs' : {'include_bias': False, 'interaction_only': True}
                 }
@@ -460,6 +447,94 @@ class interaction_terms(TransformChain):
             exp_idx = len(transformations[:-1]) + len(expanded_transformations)
         model_config['feature_settings']['feature_engineering'] = transformations
         super(interaction_terms, self).__init__(transformations[:exp_idx], model_config, project_settings)
+
+class ind_interaction_terms(basis_expansion):
+
+    def __init__(self, model_config, project_settings):
+        super(ind_interaction_terms, self).__init__(model_config, project_settings)
+
+    def configure_features(self):
+        prior_features = self.load_prior_features()
+        inclusion_patterns = self.inclusion_patterns
+        if not pd.Series([x in prior_features.values() for x in inclusion_patterns]).any():
+            print "Specified interaction: (" + ', '.join(inclusion_patterns) + ') not available at run-time. Please remove from yaml file'
+            raise Exception
+        base_features = dict()
+        col_indices = list()
+        for key in prior_features:
+            base_feature = prior_features[key]
+            while ')' in base_feature:
+                base_feature = self.get_base_column_name(base_feature)
+            base_features[key] = base_feature
+            col_indices = col_indices + [key]
+        assert len(inclusion_patterns) == 2
+        t0,t1 = inclusion_patterns[0],inclusion_patterns[1]
+        len_t0_str = len(t0)
+        len_t1_str = len(t1)
+        base_feature_names = base_features.values()
+        t0_col_vals = filter(lambda x: x[0:len_t0_str] == t0, base_feature_names)
+        t1_col_vals = filter(lambda x: x[0:len_t1_str] == t1, base_feature_names)
+        expanded_interactions = list(itertools.product(t0_col_vals, t1_col_vals))
+        self.expanded_interactions = expanded_interactions
+        relevant_base_cols = list(set([item for sublist in expanded_interactions for item in sublist])) #flattened list
+        col_to_ind_map = flip_dict(base_features)
+        touch_indices = [col_to_ind_map[rbc] for rbc in relevant_base_cols]
+        untouched_indices = list(set(col_indices).difference(set(touch_indices)))
+        self.touch_indices = touch_indices
+        self.untouched_indices = untouched_indices
+        new_features = self.gen_new_column_names(touch_indices, prior_features)
+        new_feature_set = self.reindex(prior_features, new_features)
+        #self.update_inclusion_patterns(prior_features)
+        self.inclusion_patterns = [prior_features[i] for i in touch_indices]
+        self.features = new_feature_set
+        #if self.creates_numeric_column:
+        #    self.update_model_numeric_columns(prior_features, new_features)
+        model_config = self.model_config
+        if model_config.has_key('numeric_features'):
+            existing_numeric_features = model_config['numeric_features']
+            #if any columns touched by transformer were numeric
+            if pd.Series([prior_features[i] in existing_numeric_features for i in touch_indices]).any():
+                self.update_model_numeric_columns(prior_features, new_features)
+            else:
+                self.creates_numeric_column = False
+        self.output_features()
+
+    def fit(self,X,y):
+        expanded_interactions = self.expanded_interactions
+        prior_features = self.load_prior_features() #TODO: figure out a point to just make this a member rather than load
+        col_to_ind_map = flip_dict(prior_features)
+        pairwise_int_transformer_dict = OrderedDict()
+        for inter in expanded_interactions:
+            ind_tuple = (col_to_ind_map[inter[0]], col_to_ind_map[inter[1]])
+            X_int = X.loc[:,ind_tuple]
+            base_transformer = self.base_transformer
+            base_transformer.fit(X_int,y)
+            pairwise_int_transformer_dict[ind_tuple] = base_transformer
+            self.set_base_transformer(PolynomialFeatures(**self.kwargs))
+        self.pairwise_int_transformer_dict = pairwise_int_transformer_dict
+
+    def transform(self, X_touch, y_touch, **kwargs): #TODO: is there a way I could remove unused y_touch's from these signatures?
+        pairwise_int_transformer_dict = self.pairwise_int_transformer_dict
+        pairwise_ints = pairwise_int_transformer_dict.keys()
+        X_touched = pd.DataFrame() #pandas dependent, as usual
+        for pwi in pairwise_ints:
+            transformer_i = pairwise_int_transformer_dict[pwi]
+            Xt = transformer_i.transform(X_touch.loc[:, pwi])
+            X_touched_i = pd.DataFrame(Xt, index=X_touch.index)
+            X_touched = pd.concat([X_touched, X_touched_i],axis=1)
+        assert X_touched.shape[1] == len(pairwise_ints) * 3
+        return X_touched, y_touch
+
+
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        expanded_interactions = self.expanded_interactions
+        new_features = list()
+        for inter in expanded_interactions:
+            new_features = new_features + list(inter)
+            inter_term_name = 'inter(' + inter[0] + 'x%x' + inter[1] + ')'
+            new_features = new_features + [inter_term_name]
+        return new_features
 
 class normalize(Transformer):
     """
