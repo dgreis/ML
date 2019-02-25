@@ -23,27 +23,22 @@ from collections import OrderedDict
 
 class TransformChain(ManipulatorChain):
 
-    def __init__(self, starting_transformations, model_config, project_settings):
+    def __init__(self, transform_chain_id, starting_transformations, model_config, project_settings):
         updated_transformations = list()
-        model_config['feature_settings']['order'] = 0
         engineering_module = importlib.import_module('feature.engineering')
-        for transformation in starting_transformations:
-            transformer_name = transformation.keys()[0].split('.')[-1:][0]
-            transform_class = getattr(engineering_module, transformer_name)
-            if transform_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
-                transform_chain_class = transform_class
-                working_transformations = model_config['feature_settings']['feature_engineering']
-                tc = transform_chain_class(working_transformations,model_config,project_settings)
+        for transformer_entry in starting_transformations:
+            transformer_id = transformer_entry.keys()[0]
+            transformer_class_name = transformer_entry.keys()[0].split('.')[-1:][0]
+            transformer_class = getattr(engineering_module, transformer_class_name)
+            if transformer_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
+                transform_chain_class = transformer_class
+                tc = transform_chain_class(transformer_id, starting_transformations, model_config, project_settings)
                 updated_transformations = tc.transformations
             else:
-                transformer_name = transformation.keys()[0]
-                transformer_class_name = transformer_name.split('.')[-1:][0]
-                transform_class = getattr(engineering_module, transformer_class_name)
-                transformer = transform_class(model_config, project_settings)
-                model_config['feature_settings']['order'] += 1
-                transformation[transformer_name]['initialized_manipulator'] = transformer
-                updated_transformations = updated_transformations + [transformation]
-        super(TransformChain,self).__init__(updated_transformations, model_config, project_settings)
+                transformer_instance = transformer_class(transformer_id, model_config, project_settings)
+                transformer_entry[transformer_id]['initialized_manipulator'] = transformer_instance
+                updated_transformations = updated_transformations + [transformer_entry]
+        super(TransformChain, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
         self.transformations = updated_transformations
 
     def transform(self,X_mat,y,dataset_name,fit_transform=False):
@@ -105,11 +100,43 @@ class TransformChain(ManipulatorChain):
     def fit_transform(self,X_mat,y,dataset_name):
         return self.transform(X_mat,y,dataset_name,fit_transform=True)
 
+    def fetch_transform_chain_settings(self, model_config):
+        manipulator_map = self.manipulator_map
+        manipulator_name = self.manipulator_name
+        t_idx = manipulator_map[manipulator_name]
+        manipulations = model_config['feature_settings']['manipulations']
+        transform_chain_settings = manipulations[t_idx][manipulator_name]
+        return transform_chain_settings
+
+    def update_manipulations_and_transformations(self, expanded_transformations):
+        model_config = self.model_config
+        manipulator_name = self.manipulator_name
+        manipulator_map = self.manipulator_map
+        t_idx = manipulator_map[manipulator_name]
+        existing_manipulations = model_config['feature_settings']['manipulations']
+        if t_idx == 0:
+            updated_manipulations = expanded_transformations + existing_manipulations[1:]
+            end_idx = len(expanded_transformations)
+            prior_manipulator_offset = 0
+        else:
+            prior_manipulator_entry = existing_manipulations[t_idx - 1]
+            prior_manipulator_name = prior_manipulator_entry.keys()[0]
+            prior_manipulator = prior_manipulator_entry[prior_manipulator_name]['initialized_manipulator']
+            prior_manipulator_offset = prior_manipulator.manipulator_map[prior_manipulator_name] + 1
+            if t_idx < len(existing_manipulations) - 1:
+                updated_manipulations = existing_manipulations[0:t_idx] + expanded_transformations + existing_manipulations[t_idx + 1:]
+                end_idx = len(existing_manipulations[0:t_idx]) + len(expanded_transformations)
+            else:
+                updated_manipulations = existing_manipulations[:-1] + expanded_transformations
+                end_idx = len(existing_manipulations[:-1]) + len(expanded_transformations)
+        model_config['feature_settings']['manipulations'] = updated_manipulations
+        updated_transformations = updated_manipulations[prior_manipulator_offset:end_idx]
+        return updated_transformations
+
 class Transformer(Manipulator):
 
-    def __init__(self, model_config, project_settings):
-        manipulations = model_config['feature_settings']['feature_engineering']
-        super(Transformer,self).__init__(model_config,project_settings,manipulations)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(Transformer, self).__init__(transformer_id, model_config, project_settings)
         transformer_name = self.manipulator_name
         transformer_settings = self.fetch_transform_settings(model_config,transformer_name)
         self.base_transformer = None
@@ -125,20 +152,6 @@ class Transformer(Manipulator):
         self.inclusion_patterns = transformer_settings['inclusion_patterns']
         self.exclusion_flag = False
         self.creates_numeric_column = True
-
-    def det_prior_init_feature_names_filepath(self, model_config):
-        project_settings = self.project_settings
-        if not model_config['feature_settings']['select_before_eng']:
-            prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-        else:
-            filters = model_config['feature_settings']['feature_selection']
-            num_filters = len(filters)
-            if num_filters > 0:
-                last_filter_name = filters[-1:][0].keys()[0]
-                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(last_filter_name)
-            else:
-                prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings,'feature_names')
-        return prior_manipulator_feature_names_filepath
 
     def configure_features(self):
         prior_features = self.load_prior_features()
@@ -228,7 +241,7 @@ class Transformer(Manipulator):
         return prior_features
 
     def fetch_transform_settings(self,model_config, transformer_name):
-        feature_eng_settings = model_config['feature_settings']['feature_engineering']
+        feature_eng_settings = model_config['feature_settings']['manipulations']
         for item in feature_eng_settings:
             if item.keys()[0] == transformer_name:
                 transform_settings = item[transformer_name]
@@ -317,8 +330,8 @@ class Transformer(Manipulator):
 
 class HorizontalTransformer(Transformer):
 
-    def __init__(self, model_config, project_settings):
-        super(HorizontalTransformer,self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(HorizontalTransformer, self).__init__(transformer_id, model_config, project_settings)
 
     def split(self, X_mat, y, dataset_name):
         """This is a horizontal splitting method"""
@@ -367,8 +380,8 @@ class basis_expansion(Transformer):
                     include_bias: <bool>
                     interaction_only: <bool>
     """
-    def __init__(self, model_config, project_settings):
-        super(basis_expansion, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(basis_expansion, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(PolynomialFeatures(**self.kwargs))
         #self.configure_features()
 
@@ -413,13 +426,12 @@ class interaction_terms(TransformChain):
                     - "('bill_sep','prepay_sep')"
     """
 
-    def __init__(self, transformations, model_config, project_settings):
-        Manipulator.__init__(self,model_config,project_settings,transformations) #TODO: figure out this troublesome line
-        raw_interaction_strs = filter(lambda x: x.keys()[0] == 'interaction_terms',  transformations)[0]['interaction_terms']['interactions']
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        inter_terms_entry = self.fetch_transform_chain_settings(model_config)
+        raw_interaction_strs = inter_terms_entry['interactions']
         compact_interactions = [eval(ris) for ris in raw_interaction_strs]
         expanded_transformations = list()
-        transformer_names = [d.keys()[0] for d in transformations]
-        t_idx = transformer_names.index('interaction_terms')
         i = 0
         for tuple in compact_interactions:
             t0 = tuple[0]
@@ -433,22 +445,13 @@ class interaction_terms(TransformChain):
                 }
                 expanded_transformations.append(transformation_dict)
                 i += 1
-        if t_idx == 0:
-            transformations = expanded_transformations + transformations[1:]
-            exp_idx = len(expanded_transformations)
-        elif t_idx < len(transformations) - 1:
-            transformations = transformations[0:t_idx] + expanded_transformations + transformations[t_idx + 1:]
-            exp_idx = len(transformations[0:t_idx]) + len(expanded_transformations)
-        else:
-            transformations = transformations[:-1] + expanded_transformations
-            exp_idx = len(transformations[:-1]) + len(expanded_transformations)
-        model_config['feature_settings']['feature_engineering'] = transformations
-        super(interaction_terms, self).__init__(transformations[:exp_idx], model_config, project_settings)
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(interaction_terms, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
 class ind_interaction_terms(basis_expansion):
 
-    def __init__(self, model_config, project_settings):
-        super(ind_interaction_terms, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_interaction_terms, self).__init__(transformer_id, model_config, project_settings)
 
     def configure_features(self):
         prior_features = self.load_prior_features()
@@ -547,8 +550,8 @@ class normalize(Transformer):
      that you include a list of the numeric feature names in the project_settings yaml
      file in the src folder of the project directory) with the key 'numeric_features'
     """
-    def __init__(self, model_config, project_settings):
-        super(normalize, self).__init__(model_config, project_settings )
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(normalize, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(Normalizer(**self.kwargs))
         #self.configure_features()
         pass
@@ -575,8 +578,8 @@ class standard_scale(Transformer):
      that you include a list of the numeric feature names in the project_settings yaml
      file in the src folder of the project directory) with the key 'numeric_features'
     """
-    def __init__(self, model_config, project_settings):
-        super(standard_scale, self).__init__(model_config, project_settings )
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(standard_scale, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(StandardScaler(**self.kwargs))
         #self.configure_features()
 
@@ -601,8 +604,8 @@ class pca(Transformer):
               n_components: <int>
     """
 
-    def __init__(self, model_config, project_settings):
-        super(pca, self).__init__(model_config, project_settings )
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(pca, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(PCA(**self.kwargs))
         #self.configure_features()
 
@@ -624,8 +627,8 @@ class loo_encoding(Transformer):
                    inclusion_patterns
                      - <pattern>
     """
-    def __init__(self, model_config, project_settings):
-        super(loo_encoding, self).__init__(model_config, project_settings )
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(loo_encoding, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(LeaveOneOutEncoder(**self.kwargs))
         #self.configure_features()
 
@@ -658,9 +661,8 @@ class stack(TransformChain):
                     inclusion_patterns: [<fully qualified algo 1>(str) + '.hat',
                                         <fully qualified algo 2>(str) + '.hat']
     """
-    def __init__(self, starting_transformations, model_config, project_settings):
-        Manipulator.__init__(self, model_config, project_settings,
-                             starting_transformations)
+    def __init__(self, transform_chain_id, starting_transformations, model_config, project_settings):
+        Manipulator.__init__(model_config, project_settings, starting_transformations)
         expanded_transformations = list()
         transformer_names = [d.keys()[0] for d in starting_transformations]
         t_idx = transformer_names.index('stack') #TODO: Figure out whether next 3 lines uniquely identify stacking entry?
@@ -696,14 +698,14 @@ class stack(TransformChain):
             starting_transformations = starting_transformations[:-1] + expanded_transformations
             exp_idx = len(starting_transformations[:-1]) + len(expanded_transformations)
         model_config['feature_settings']['feature_engineering'] = starting_transformations
-        super(stack, self).__init__(starting_transformations[:exp_idx], model_config, project_settings)
+        super(stack, self).__init__(transformer_id, starting_transformations[:exp_idx], model_config)
 
 class ind_stack(Transformer):
     """
     This is a utility transformation, used by stack TransformChain transformer
     """
-    def __init__(self, model_config, project_settings):
-        super(ind_stack, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_stack, self).__init__(transformer_id, model_config, project_settings)
         ind_stack_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
         ['feature_engineering'])[0][self.manipulator_name] #TODO: Figure out if method fetch_transform_settings can do this?
         self.stacking_algorithm_name = ind_stack_entry['algorithm']
@@ -745,9 +747,9 @@ class kaggle_stack(TransformChain):
                   keyword_arg_settings:
                     random_state: 1234
     """
-    def __init__(self, starting_transformations, model_config, project_settings):
-        Manipulator.__init__(self, model_config, project_settings,
-                             starting_transformations)
+    def __init__(self, transform_chain_id, starting_transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        kaggle_stack_entry = self.fetch_transform_chain_settings(model_config)
         expanded_transformations = list()
         transformer_names = [d.keys()[0] for d in starting_transformations]
         existing_include_feature_transformers = filter(lambda x: '.include_features' in x, transformer_names)
@@ -755,8 +757,6 @@ class kaggle_stack(TransformChain):
             i = 0
         else:
             i = len(existing_include_feature_transformers)
-        t_idx = transformer_names.index('kaggle_stack') #TODO: Is There better way to do this? What if you have a TC that appears more than once?
-        kaggle_stack_entry = filter(lambda x: x.keys()[0] == 'kaggle_stack', starting_transformations)[0]['kaggle_stack']
         algorithms = kaggle_stack_entry['algorithms']
         derived_cols = [d.keys()[0] + '.hat' for d in algorithms]
         oos_predictor_ensemble_entry = dict()
@@ -779,25 +779,16 @@ class kaggle_stack(TransformChain):
             'inclusion_patterns': derived_cols
         }
         expanded_transformations.append(metamodel_transformer_settings)
-        if t_idx == 0:
-            starting_transformations = expanded_transformations + starting_transformations[1:]
-            exp_idx = len(expanded_transformations)
-        elif t_idx < len(starting_transformations) - 1:
-            starting_transformations = starting_transformations[0:t_idx] + expanded_transformations + starting_transformations[t_idx + 1:]
-            exp_idx = len(starting_transformations[0:t_idx]) + len(expanded_transformations)
-        else:
-            starting_transformations = starting_transformations[:-1] + expanded_transformations
-            exp_idx = len(starting_transformations[:-1]) + len(expanded_transformations)
-        model_config['feature_settings']['feature_engineering'] = starting_transformations
-        super(kaggle_stack, self).__init__(starting_transformations[:exp_idx], model_config, project_settings)
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(kaggle_stack, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
 class oos_predictor_ensemble(Transformer):
     """Utility class used by kaggle_stack
 
     (Refer to kaggle_stack TC constructor for more info if this transform is ever explicitly specified by user)
     """
-    def __init__(self, model_config, project_settings):
-        super(oos_predictor_ensemble, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(oos_predictor_ensemble, self).__init__(transformer_id, model_config, project_settings)
         oos_predictor_ensemble_settings = self.fetch_transform_settings(model_config, self.manipulator_name)
         algorithms = oos_predictor_ensemble_settings['algorithms']
         ens_algos = list()
@@ -842,8 +833,8 @@ class metamodel(Transformer):
 
     (Refer to kaggle_stack TC constructor for more info if this transform is ever explicitly specified by user)
     """
-    def __init__(self, model_config, project_settings):
-        super(metamodel, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(metamodel, self).__init__(transformer_id, model_config, project_settings)
         metamodel_settings = self.fetch_transform_settings(model_config, self.manipulator_name)
         base_algorithm = metamodel_settings['base_algorithm']
         self.base_algorithm = base_algorithm
@@ -873,8 +864,8 @@ class interpolate(Transformer):
                     lowess: {}
                     interp1d: {}
     """
-    def __init__(self, model_config, project_settings):
-        super(interpolate, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(interpolate, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(None)
         #self.configure_features()
 
@@ -916,9 +907,8 @@ class as_numeric(TransformChain):
                  - <pattern> : { str:val, str:val,...}
     """
 
-    def __init__(self, starting_transformations, model_config, project_settings):
-        Manipulator.__init__(self, model_config, project_settings,
-                             transformations)
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(model_config, project_settings, transformations)
         expanded_transformations = list()
         transformer_names = [d.keys()[0] for d in transformations]
         t_idx = transformer_names.index('as_numeric')
@@ -949,15 +939,15 @@ class as_numeric(TransformChain):
             transformations = transformations[:-1] + expanded_transformations
             exp_idx = len(transformations[:-1]) + len(expanded_transformations)
         model_config['feature_settings']['feature_engineering'] = transformations
-        super(as_numeric, self).__init__(transformations[:exp_idx], model_config, project_settings)
+        super(as_numeric, self).__init__(transformer_id, transformations[:exp_idx], model_config)
 
 #TODO: handle numeric_features here. It needs to flip from non to yes
 class ind_as_numeric(Transformer):
     """
     This is a utility transformation, used by as_numeric transformchain transformer
     """
-    def __init__(self,model_config, project_settings):
-        super(ind_as_numeric, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_as_numeric, self).__init__(transformer_id, model_config, project_settings)
         #self.configure_features()
         ind_as_numeric_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
                         ['feature_engineering'])[0][self.manipulator_name]
@@ -989,8 +979,8 @@ class sample(HorizontalTransformer):
                    kwargs:
                       upsample: <boolean> (def: False):
     """
-    def __init__(self,model_config,project_settings):
-        super(sample, self).__init__(model_config, project_settings )
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(sample, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(Sampler(**self.kwargs))
         #self.configure_features()
 
@@ -1016,8 +1006,8 @@ class sample(HorizontalTransformer):
 
 class predict(Transformer):
 
-    def __init__(self,model_config,project_settings):
-        super(predict, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(predict, self).__init__(transformer_id, model_config, project_settings)
         predict_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
                         ['feature_engineering'])[0][self.manipulator_name]
         base_algoritm = predict_entry['base_algorithm']
@@ -1050,8 +1040,8 @@ class predict(Transformer):
 
 class reset_data(Transformer):
 
-    def __init__(self,model_config,project_settings):
-        super(reset_data, self).__init__(model_config, project_settings )
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(reset_data, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(Identity(**self.kwargs))
         #self.configure_features()
 
@@ -1076,8 +1066,8 @@ class exclude_features(Transformer):
                 inclusion_patterns:
                   - <matching pattern>
     """
-    def __init__(self, model_config, project_settings):
-        super(exclude_features, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(exclude_features, self).__init__(transformer_id, model_config, project_settings)
         #self.configure_features()
         self.set_base_transformer(Deleter(**self.kwargs))
 
@@ -1096,8 +1086,8 @@ class include_features(Transformer):
                 inclusion_patterns:
                   - <matching pattern>
     """
-    def __init__(self, model_config, project_settings):
-        super(include_features, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(include_features, self).__init__(transformer_id, model_config, project_settings)
         setattr(self,'exclusion_flag',True)
         #self.configure_features()
         self.set_base_transformer(Deleter(**self.kwargs))
@@ -1107,14 +1097,11 @@ class include_features(Transformer):
 
 class drop_outliers(TransformChain):
     """TODO: Documentation?"""
-    def __init__(self, transformations, model_config, project_settings):
-        Manipulator.__init__(self, model_config, project_settings,
-                             transformations)
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
         expanded_transformations = list()
-        transformer_names = [d.keys()[0] for d in transformations]
-        t_idx = transformer_names.index('drop_outliers')
+        drop_outliers_entry = self.fetch_transform_chain_settings(model_config)
         i = 0
-        drop_outliers_entry = filter(lambda x: x.keys()[0] == 'drop_outliers', transformations)[0]['drop_outliers']
         inclusion_patterns = drop_outliers_entry['inclusion_patterns']
         for pattern in inclusion_patterns:
             transformation_dict = dict()
@@ -1124,22 +1111,13 @@ class drop_outliers(TransformChain):
             }
             expanded_transformations.append(transformation_dict)
             i += 1
-        if t_idx == 0:
-            transformations = expanded_transformations + transformations[1:]
-            exp_idx = len(expanded_transformations)
-        elif t_idx < len(transformations) - 1:
-            transformations = transformations[0:t_idx] + expanded_transformations + transformations[t_idx + 1:]
-            exp_idx = len(transformations[0:t_idx]) + len(expanded_transformations)
-        else:
-            transformations = transformations[:-1] + expanded_transformations
-            exp_idx = len(transformations[:-1]) + len(expanded_transformations)
-        model_config['feature_settings']['feature_engineering'] = transformations
-        super(drop_outliers, self).__init__(transformations[:exp_idx], model_config, project_settings)
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(drop_outliers, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
 class ind_drop_outliers(HorizontalTransformer):
 
-    def __init__(self, model_config, project_settings):
-        super(ind_drop_outliers, self).__init__(model_config, project_settings)
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_drop_outliers, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(Truncator(**self.kwargs))
         #self.configure_features()
 

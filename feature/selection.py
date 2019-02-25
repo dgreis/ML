@@ -18,18 +18,16 @@ from sklearn.feature_selection import f_regression
 
 class FilterChain(ManipulatorChain):
 
-    def __init__(self, filter_list, model_config, project_settings):
-        model_config['feature_settings']['order'] = 0
+    def __init__(self, filter_chain_id, filter_list, model_config, project_settings):
         selection_module = importlib.import_module('feature.selection')
         initialized_filters = list()
         for entry in filter_list:
-            filter_name = entry.keys()[0]
-            filter_class = getattr(selection_module, filter_name)
-            filter_instance = filter_class(model_config, project_settings)
-            model_config['feature_settings']['order'] += 1
-            entry[filter_name]['initialized_manipulator'] = filter_instance
+            filter_id = entry.keys()[0]
+            filter_class = getattr(selection_module, filter_id) #TODO: This assumes filter_id's always mirror filter classes
+            filter_instance = filter_class(filter_id, model_config, project_settings)
+            entry[filter_id]['initialized_manipulator'] = filter_instance
             initialized_filters = initialized_filters + [entry]
-        super(FilterChain,self).__init__(initialized_filters, model_config, project_settings)
+        super(FilterChain, self).__init__(filter_chain_id, filter_list, model_config, project_settings)
         self.filters = initialized_filters
 
     def fit_transform(self,X_mat,y,dataset_name):
@@ -107,13 +105,13 @@ class FilterChain(ManipulatorChain):
 
 class Filter(Manipulator):
 
-    def __init__(self, model_config, project_settings):
-        manipulations = model_config['feature_settings']['feature_selection']
-        super(Filter,self).__init__(model_config, project_settings,manipulations)
+    def __init__(self, filter_id, model_config, project_settings):
+        manipulations = model_config['feature_settings']['manipulations']
+        super(Filter, self).__init__(filter_id, model_config, project_settings)
 
     def fetch_filter_settings(self,filter_name):
         model_config = self.model_config
-        feature_selection_settings = model_config['feature_settings']['feature_selection']
+        feature_selection_settings = model_config['feature_settings']['manipulations']
         for item in feature_selection_settings:
             if item.keys()[0] == filter_name:
                 filter_settings = item[filter_name]
@@ -130,21 +128,6 @@ class Filter(Manipulator):
         filtered_features = {k: v for k, v in column_map.iteritems() if k in untouched_indices}
         self.features = filtered_features
 
-    def det_prior_init_feature_names_filepath(self, model_config):
-        project_settings = self.project_settings
-        if model_config['feature_settings']['select_before_eng']:
-            prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-        else:
-            transformations = model_config['feature_settings']['feature_engineering']
-            num_transformations = len(transformations)
-            if num_transformations > 0:
-                last_transformer_name = transformations[-1:][0].keys()[0]
-                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(last_transformer_name)
-            else:
-                prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings,'feature_names')
-        return prior_manipulator_feature_names_filepath
-
-
 class l1_based(Filter):
     """
     Sample yaml usage:
@@ -157,8 +140,8 @@ class l1_based(Filter):
                kwargs:
                  dual: False
     """
-    def __init__(self,model_config,project_settings):
-        Filter.__init__(self,model_config,project_settings)
+    def __init__(self, filter_id, model_config, project_settings):
+        super(l1_based, self).__init__(filter_id, model_config, project_settings)
         self.l1_settings = self.fetch_filter_settings('l1_based')
 
     def fit(self, X_mat, y):
@@ -199,8 +182,8 @@ class tree_based(Filter):
               keyword_arg_settings: {}
               other_options: {}
     """
-    def __init__(self,model_config,project_settings):
-        super(tree_based,self).__init__(model_config,project_settings)
+    def __init__(self, filter_id, model_config, project_settings):
+        super(tree_based, self).__init__(filter_id, model_config, project_settings)
         tree_model_config = self.fetch_filter_settings('tree_based')
         tree_model_config['feature_settings'] = model_config['feature_settings']
         tree_model_config['model_name'] = model_config['model_name'] + '-tree-based-feature-selection'
@@ -231,7 +214,6 @@ class tree_based(Filter):
         touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
         self._store_indices_and_features(untouched_indices,touch_indices)
 
-
 class f_based(Filter):
     """
      Example yaml usage:
@@ -247,8 +229,8 @@ class f_based(Filter):
                     k: <int>
      """
 
-    def __init__(self,model_config,project_settings):
-        super(f_based,self).__init__(model_config,project_settings)
+    def __init__(self, filter_id, model_config, project_settings):
+        super(f_based, self).__init__(filter_id, model_config, project_settings)
         self.f_based_settings = self.fetch_filter_settings('f_based')
 
     def fit(self,X_mat,y):
@@ -270,8 +252,8 @@ class f_based(Filter):
 
 class recursive_feature_elimination(Filter):
 
-    def __init__(self,model_config):
-        Filter.__init__(self,model_config)
+    def __init__(self, filter_id, model_config):
+        super(recursive_feature_elimination,self).__init__(filter_id, model_config, project_settings)
         self.rfe_settings = self.fetch_filter_settings('recursive_feature_elimination')
 
 

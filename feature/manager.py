@@ -1,5 +1,9 @@
+import importlib
+
 import pandas as pd
 import numpy as np
+
+from collections import OrderedDict
 
 from feature.engineering import TransformChain
 from feature.selection import FilterChain
@@ -8,23 +12,62 @@ from utils import find_data_dir, load_clean_input_file_filepath, load_inv_column
 class Manager:
 
     def __init__(self,model_config, project_settings):
-        transformations = model_config['feature_settings']['feature_engineering']
-        filters = model_config['feature_settings']['feature_selection']
 
-        transformer_chain = TransformChain(transformations, model_config, project_settings)
-        filter_chain = FilterChain(filters, model_config, project_settings)
+        manipulations = model_config['feature_settings']['manipulations']
+
+        selection_module = importlib.import_module('feature.selection')
+        engineering_module = importlib.import_module('feature.engineering')
+        manipulator_map = dict()
+        chain_plan = list()
+        i = 0
+        for m in manipulations:
+            manipulator_id = m.keys()[0]
+            manipulator_class_name = manipulator_id.split('.')[-1:][0]
+            if hasattr(engineering_module, manipulator_class_name):
+                manipulator_type = 'transformer'
+            elif hasattr(selection_module, manipulator_class_name):
+                manipulator_type = 'filter'
+            else:
+                raise Exception
+            manipulator_map[i] = { 'manipulator_name' : manipulator_id, 'manipulator_type' : manipulator_type }
+            if i == 0:
+                chain_plan.append((manipulator_type, 0))
+            elif chain_plan[-1][0] != manipulator_type:
+                chain_plan.append((manipulator_type, i))
+            i += 1
+
+        len_chain = len(chain_plan)
+        counter = 1
+        chain_of_chains = list()
+        for item in chain_plan:
+            if counter < len_chain:
+                end_idx = chain_plan[counter][1]
+            else:
+                end_idx = len(manipulations)
+            beg_idx = item[1]
+            chain_manipulations = manipulations[beg_idx:end_idx]
+            if item[0] == 'transformer':
+                chain = TransformChain('_' + str(counter - 1) + '_tc_', chain_manipulations, model_config, project_settings)
+            else:
+                chain = FilterChain('_' + str(counter - 1) + '_fc_', chain_manipulations, model_config, project_settings)
+                pass
+            chain_of_chains.append(chain)
+            counter += 1
+
         self.model_config = model_config
         self.project_settings = project_settings
 
-        initialized_manipulations =  filter_chain.filters + transformer_chain.transformations
-        leak_enforcer = LeakEnforcer(initialized_manipulations)
+        initialized_manipulators = list()
+        for chain in chain_of_chains:
+            initialized_manipulators = initialized_manipulators + chain.manipulations
+        leak_enforcer = LeakEnforcer(initialized_manipulators)
         self.leak_enforcer = leak_enforcer
         self.return_train_val = leak_enforcer.has_peekers
 
-        for chain in [filter_chain, transformer_chain]:
-            chain.set_leak_enforcer(leak_enforcer)
-        self.filter_chain = filter_chain
-        self.transformer_chain = transformer_chain
+        for chain in chain_of_chains:
+            chain.set_leak_enforcer(leak_enforcer) #TODO: Any reason for this to be separate loop?
+
+        self.chain_of_chains = chain_of_chains
 
     def return_fold_dev_val_ind(self,fold_num):
         model_config = self.model_config
@@ -37,38 +80,26 @@ class Manager:
 
     def fit_transform(self, X, y, dataset_name):
 
-        model_config = self.model_config
-
-        fc = self.filter_chain
-        tc = self.transformer_chain
-
-        if model_config['feature_settings']['select_before_eng']:
-            X_1st, y_1st = fc.fit_transform(X, y, dataset_name)
-            X_2nd, y_2nd = tc.fit_transform(X_1st, y_1st,dataset_name)
-        else:
-            X_1st, y_1st = tc.fit_transform(X, y,dataset_name)
-            X_2nd, y_2nd = fc.fit_transform(X_1st, y_1st, dataset_name)
+        chain_of_chains = self.chain_of_chains
 
         assert X.shape[0] == len(y)
 
-        return X_2nd, y_2nd
+        for chain in chain_of_chains:
+            X_t, y_t = chain.fit_transform(X, y, dataset_name)
+
+        assert X_t.shape[0] == len(y_t)
+
+        return X_t, y_t
 
 
     def transform(self,X, y, dataset_name):
 
-        model_config = self.model_config
+        chain_of_chains = self.chain_of_chains
 
-        fc = self.filter_chain
-        tc = self.transformer_chain
+        for chain in chain_of_chains:
+            X_t, y_t = chain.transform(X, y, dataset_name)
 
-        if model_config['feature_settings']['select_before_eng']:
-            X_1st, y_1st = fc.transform(X,y,dataset_name)
-            X_2nd, y_2nd = tc.transform(X_1st,y_1st, dataset_name)
-        else:
-            X_1st, y_1st = tc.transform(X,y, dataset_name)
-            X_2nd, y_2nd = fc.transform(X_1st,y_1st, dataset_name)
-
-        return X_2nd, y_2nd
+        return X_t, y_t
 
     def load_clean_datasets(self,dataset_name, project_settings):
 

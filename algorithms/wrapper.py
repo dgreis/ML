@@ -18,41 +18,7 @@ class Wrapper(Manipulator):
             self.gen_output_flag = arg_val
         else:
             self.gen_output_flag = False
-        if model_config['feature_settings']['select_before_eng']:
-            manipulations = model_config['feature_settings']['feature_selection'] + model_config['feature_settings']['feature_engineering']
-        else:
-            manipulations = model_config['feature_settings']['feature_engineering'] + model_config['feature_settings']['feature_selection']
-        super(Wrapper,self).__init__(model_config,project_settings,manipulations)
-
-    def det_prior_init_feature_names_filepath(self, model_config):
-        project_settings = self.project_settings
-        filters = model_config['feature_settings']['feature_selection']
-        transformers = model_config['feature_settings']['feature_engineering']
-        mode = self.mode
-        if model_config['feature_settings']['select_before_eng']:
-            if mode == 'transformer':
-                if len(filters) > 0:
-                    prior_manipulator_name = filters[-1].keys()[0]
-                    prior_manipulator_filepath = self._det_output_features_filepath(prior_manipulator_name)
-                else:
-                    prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-            elif mode == 'filter':
-                prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-            else:
-                raise NotImplementedError
-        else:
-            if mode == 'transformer':
-                prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-            elif mode == 'filter':
-                if len(transformers) > 0:
-                    prior_manipulator_name = transformers[-1].keys()[0]
-                    prior_manipulator_filepath = self._det_output_features_filepath(prior_manipulator_name)
-                else:
-                    prior_manipulator_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-            else:
-                raise NotImplementedError
-        return prior_manipulator_filepath
-
+        super(Wrapper, self).__init__('algorithm', model_config, project_settings)
 
     def fit(self,X,y):
         self.base_algorithm.fit(X,y)

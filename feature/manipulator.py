@@ -1,17 +1,17 @@
 import inspect
-import importlib
 import pandas as pd
 import os
+import algorithms.wrapper
 
 from django.utils.text import slugify
-
-from utils import find_project_dir, load_inv_column_map, flip_dict
+from utils import find_project_dir, flip_dict, load_clean_input_file_filepath
 
 
 class Manipulator(object):
 
-    def __init__(self,model_config, project_settings,manipulations):
+    def __init__(self, manipulator_id, model_config, project_settings):
         super(Manipulator,self).__init__()
+        self.manipulator_name = manipulator_id #TODO: change all manipulator_name to id
         self.model_config = model_config
         self.project_settings = project_settings
         project_dir = find_project_dir(project_settings)
@@ -21,40 +21,20 @@ class Manipulator(object):
         self.artifact_dir = artifact_dir
         self.features = None
         self.validation_peeking = False
-        if not self.is_manipulator_chain():
-            if len(manipulations) > 0:
-                manipulator_names = [d.keys()[0] for d in manipulations]
-                if model_config['feature_settings'].has_key('order'):
-                    order = model_config['feature_settings']['order']
-                    if order == 0:
-                        prior_manipulator_feature_names_filepath = self.det_prior_init_feature_names_filepath(model_config)
-                        manipulator_name = manipulator_names[0]
-                    else:
-                        prior_transform = manipulator_names[order-1]
-                        prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_transform)
-                        manipulator_name = manipulator_names[order]
-                    self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
-                    self.manipulator_name = manipulator_name
-                else:
-                    prior_manipulator_name = manipulations[-1:][0].keys()[0]
-                    prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_manipulator_name)
-                    self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
-                    self.manipulator_name = 'algorithm'
+        manipulations = model_config['feature_settings']['manipulations']
+        manipulator_names = [d.keys()[0] for d in manipulations]
+        manipulator_map = dict(zip(manipulator_names, range(len(manipulator_names))))
+        self.manipulator_map = manipulator_map
+        if not issubclass(self.__class__, (ManipulatorChain, algorithms.wrapper.Wrapper)):
+            m_order = manipulator_map[manipulator_id]
+            if m_order == 0:
+                prior_manipulator = None
+                prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
             else:
-                pass
-
-    def is_manipulator_chain(self):
-        #TODO: Find a better way to do this, using issubclass
-        manipulator_module = importlib.import_module('feature.manipulator')
-        if self.__class__.__bases__[0] == getattr(manipulator_module,'ManipulatorChain'):
-            return True
-        elif self.__class__.__bases__[0].__bases__[0] == getattr(manipulator_module,'ManipulatorChain'):
-            return True
-        else:
-            return False
-
-    def det_prior_init_feature_names_filepath(self, model_config):
-        raise NotImplementedError
+                ord_manip_lookup = flip_dict(manipulator_map)
+                prior_manipulator = ord_manip_lookup[m_order - 1]
+                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_manipulator)
+            self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
 
     def _det_output_features_filepath(self,manipulator_name):
         model_config = self.model_config
@@ -97,12 +77,12 @@ class Manipulator(object):
         assert ni == len(new_features) + len(untouched_indices)
         return new_col_map
 
-
 class ManipulatorChain(Manipulator):
 
-    def __init__(self, manipulations, model_config, project_settings):
-        super(ManipulatorChain, self).__init__(model_config,project_settings, manipulations)
+    def __init__(self, manipulator_id, manipulations, model_config, project_settings):
+        super(ManipulatorChain, self).__init__(manipulator_id, model_config, project_settings)
         self.leak_enforcer = None
+        self.manipulations = manipulations
 
     def set_leak_enforcer(self,leak_enforcer):
         self.leak_enforcer = leak_enforcer
