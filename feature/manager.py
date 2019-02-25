@@ -11,8 +11,8 @@ class Manager:
         transformations = model_config['feature_settings']['feature_engineering']
         filters = model_config['feature_settings']['feature_selection']
 
-        filter_chain = FilterChain(filters, model_config, project_settings)
         transformer_chain = TransformChain(transformations, model_config, project_settings)
+        filter_chain = FilterChain(filters, model_config, project_settings)
         self.model_config = model_config
         self.project_settings = project_settings
 
