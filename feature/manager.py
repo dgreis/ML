@@ -18,6 +18,7 @@ class Manager:
 
         initialized_manipulations =  filter_chain.filters + transformer_chain.transformations
         leak_enforcer = LeakEnforcer(initialized_manipulations)
+        self.leak_enforcer = leak_enforcer
         self.return_train_val = leak_enforcer.has_peekers
 
         for chain in [filter_chain, transformer_chain]:

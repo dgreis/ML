@@ -62,6 +62,9 @@ def main():
         X_val_p, y_val_p = manager.transform(X_val, y_val, 'val')
         assert X_train_p.shape[1] == X_val_p.shape[1]
         assert len(y_val_p) == len(y_val)
+        le = manager.leak_enforcer
+        if le.check_for_leak(X_train_p):
+            X_train_p, y_train_p = le.remove_leaking_indices(X_train_p, y_train_p)
         print("Validation dataset finalized. Training with " + str(len(X_train_p)) + " samples. Validation data with " +\
               str(len(X_val_p)) + " samples. Model with " + str(X_val_p.shape[1]) + " features. Now fitting model... ",end="")
         model.fit(X_train_p, y_train_p)

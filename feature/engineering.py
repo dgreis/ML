@@ -53,7 +53,6 @@ class TransformChain(ManipulatorChain):
             X_transform, y_transform = X_mat, y
         else:
             i = 1
-            was_leak = False
             for d in transformations:
                 transformer_name = d.keys()[0]
                 transformer = d[transformer_name]['initialized_manipulator']
@@ -101,8 +100,6 @@ class TransformChain(ManipulatorChain):
                         transformer.store_output(X_transform,output_dir=artifact_dir)
                 X_mat, y = X_transform, y_transform
                 i += 1
-            if was_leak:
-                X_transform, y_transform = le.remove_leaking_indices(X_transform, y_transform)
         return X_transform, y_transform
 
     def fit_transform(self,X_mat,y,dataset_name):

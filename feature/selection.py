@@ -51,7 +51,21 @@ class FilterChain(ManipulatorChain):
                 for arg in additional_args:
                     kwargs[arg] = getattr(self,arg)
                 filter_instance = entry[filter_name]['initialized_manipulator']
-                filter_instance.fit(X_filt,y_filt,**kwargs)
+                le = self.leak_enforcer
+                leak_exists = le.check_for_leak(X_filt)
+                leak_allowed = le.check_leak_allowed(filter_name)
+                if leak_exists:
+                    if leak_allowed:
+                        # TODO: output print statements like this to log file to have record somewhere
+                        #print "\t\tLeak is allowed for " + filter_name + ". CV Metrics will be invalid"
+                        raise Exception
+                        X_dev, y_dev = X_filt, y_filt
+                    else:
+                        #print "\t\tLeak found for manipulator: " + filter_name +". Removing leaked indices . . ."
+                        X_dev, y_dev = le.remove_leaking_indices(X_filt, y_filt)
+                else:
+                    X_dev, y_dev = X_filt, y_filt
+                filter_instance.fit(X_dev,y_dev,**kwargs)
                 features = filter_instance.features
                 reindexed_features = filter_instance.reindex(features)
                 #filter_instance.features = reindexed_features
@@ -248,7 +262,6 @@ class f_based(Filter):
             raise NotImplementedError
         other_options = f_based_settings['other_options']
         k = other_options['k']
-
         selector = SelectKBest(f_model, k=k).fit(X_mat, y)
         ir = pd.Series(selector.get_support())
         untouched_indices = ir[ir == True].index
