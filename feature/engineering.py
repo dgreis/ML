@@ -396,7 +396,7 @@ class basis_expansion(Transformer):
         orig_tcol_names = [prior_features[idx] for idx in touch_indices]
         Xt_feat_names = orig_tcol_names + stiched_feature_names
         if getattr(self.base_transformer,'include_bias'):
-            Xt_feat_names = ['bias'] + Xt_feat_names #TODO: make this bias term uniquely named, i.e. the manipulator name?
+            Xt_feat_names = [self.manipulator_name + '.bias'] + Xt_feat_names
         if getattr(self.base_transformer,'interaction_only'):
             Xt_feat_names = filter(lambda x: '**' not in x, Xt_feat_names)
         return Xt_feat_names
@@ -1128,19 +1128,13 @@ class ind_drop_outliers(HorizontalTransformer):
         ti = X_col.columns[0]
         truncator = self.base_transformer
         truncator.fit(X_col)
-        X_mat_sub = X_col[(X_col.loc[:, ti] > truncator.lthrsh) & (X_col.loc[:, ti] < truncator.uthrsh)].copy()
+        if pd.isnull(truncator.lthrsh):
+            X_mat_sub = X_col
+            print "\t\t" + self.inclusion_patterns[0] + " drop outliers has an IQR = 0. No observations will be dropped"
+        else:
+            X_mat_sub = X_col[(X_col.loc[:, ti] > truncator.lthrsh) & (X_col.loc[:, ti] < truncator.uthrsh)].copy()
         untouched_indices = list(X_mat_sub.index)
         touch_indices = list(set(X_mat_idx).difference(set(untouched_indices)))
         assert len(touch_indices) + len(untouched_indices) == len(X_col)
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
-        #setattr(self.base_transformer, 'touch_indices', touch_indices)
-        #setattr(self.base_transformer, 'untouched_indices', untouched_indices)
-
-    # TODO: Delete this? Should HorizontalTransformers ever implement gen_new_column_names?
-    # def gen_new_column_names(self, touch_indices, prior_features):
-    #     relevant_features = [prior_features[ti] for ti in touch_indices]
-    #     new_features = list()
-    #     for rf in relevant_features:
-    #         new_features.append('trunc(' + rf + ')')
-    #     return new_features
