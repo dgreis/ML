@@ -272,8 +272,12 @@ class Truncator:
         desc = X_col.describe()
         IQR = (desc.loc['75%'] - desc.loc['25%']).values[0]
         assert not pd.isnull(IQR)
-        uthrsh = desc.loc['75%'].values[0] + 1.5*IQR
-        lthrsh = desc.loc['25%'].values[0] - 1.5*IQR
+        if IQR == 0:
+            uthrsh = np.nan
+            lthrsh = np.nan
+        else:
+            uthrsh = desc.loc['75%'].values[0] + 1.5*IQR
+            lthrsh = desc.loc['25%'].values[0] - 1.5*IQR
         self.uthrsh = uthrsh
         self.lthrsh= lthrsh
 
