@@ -8,6 +8,7 @@ from evaluation import load_evaluation_battery
 from itertools import izip, product
 from sklearn.model_selection import KFold
 from feature.manager import Manager
+from algorithms.algoutils import configure_algorithm
 
 class CrossValidator:
 
@@ -37,7 +38,7 @@ class CrossValidator:
             setattr(model,param,optimal_hyperparams[param])
         return model
 
-    def perform_cross_validation(self, data, model):
+    def perform_cross_validation(self, data, model_config):
         """Example in models.yaml file:
         Models:
             Model Name:
@@ -50,6 +51,8 @@ class CrossValidator:
         grid = self.grid
         num_settings = len(grid)
         num_folds = self.cv_num_folds
+        project_settings = self.project_settings
+        model = configure_algorithm(model_config, project_settings)
         report_entries = pd.DataFrame({'dataset_name':[],'model_name':[],'setting': [], 'metric': [],'content': []})
         i = 1
         for setting in grid:

@@ -234,12 +234,6 @@ class Transformer(Manipulator):
         else:
             pass
 
-    def load_prior_features(self):
-        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
-        prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
-        prior_features = flip_dict(prior_inv_col_map)
-        return prior_features
-
     def fetch_transform_settings(self,model_config, transformer_name):
         feature_eng_settings = model_config['feature_settings']['manipulations']
         for item in feature_eng_settings:
@@ -554,7 +548,6 @@ class normalize(Transformer):
         super(normalize, self).__init__(transformer_id, model_config, project_settings)
         self.set_base_transformer(Normalizer(**self.kwargs))
         #self.configure_features()
-        pass
 
     def gen_new_column_names(self, orig_tcol_idx, working_features):
         Xt_feat_names = list()
@@ -687,7 +680,6 @@ class stack(TransformChain):
             derived_cols = derived_cols + [algorithm_name + '.hat']
             expanded_transformations.append(transformation_dict)
             i += 1
-            pass
         if t_idx == 0:
             starting_transformations = expanded_transformations + starting_transformations[1:]
             exp_idx = len(expanded_transformations)
@@ -734,7 +726,7 @@ class kaggle_stack(TransformChain):
   Model Name:
     base_algorithm: algorithms.common.MetaModeler
     feature_settings:
-      feature_engineering:
+      manipulations:
         - kaggle_stack:
             inclusion_patterns:
               - 'All'
@@ -1022,7 +1014,7 @@ class predict(Transformer):
                                                   'feature_engineering' : []    #some yaml parsing logic, must be somewhere in
                                                 }                               #code already, to fill out config not def by user
         predict_entry['model_name'] = self.manipulator_name
-        self.set_base_transformer(Wrapper(base_algo_class, predict_entry,project_settings))
+        self.set_base_transformer(Wrapper(transformer_id, base_algo_class, predict_entry, project_settings))
         #self.configure_features()
 
     def gen_new_column_names(self, touch_indices, prior_features):

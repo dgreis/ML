@@ -7,12 +7,13 @@ from utils import *
 from evaluation import *
 from cross_validation import *
 from report import Report
-from algorithms.algoutils import configure_algorithms
+from algorithms.algoutils import configure_algorithm
 
 global_settings = yaml.load(open('./global_settings.yaml'))
 project_settings = configure_project_settings(global_settings)
 
 #TODO: some sort of clean-up of feature files so that program doesn't mistakenly use from past runs
+#TODO: a test-suite that can run every manipulator to make sure I didn't break anything whenever I change something
 def main():
     if not all_clean_input_files_exist(project_settings):
         prep_data = importlib.import_module('projects.' + project_settings['project_name'] + '.src.' + 'prep_data')
@@ -20,29 +21,27 @@ def main():
         print("Data Built for project: " + global_settings['current_project'])
     project_settings['working_files'] = project_settings['clean_input_files'].copy()
 
-    model_configs = load_model_configs(project_settings)
-    models = configure_algorithms(model_configs, project_settings)
-    num_models = len(models)
+    model_configs = load_model_configs(project_settings)['Models']
+    num_models = len(model_configs)
 
     print("\nFit ML models for project: " + project_settings['project_name'])
     print( "Number of models to fit: " + str(num_models))
     i = 1
     report = Report(project_settings)
-    for model_name in models:
+    for model_name in model_configs:
         print("\nFitting model (" + str(i) + "/" + str(num_models) + "): " + model_name)
-        model_config = model_configs['Models'][model_name]
+        model_config = model_configs[model_name]
         model_config['model_name'] = model_name
         if project_settings.has_key('numeric_features'):
             model_config['numeric_features'] = copy.copy(project_settings['numeric_features'])
             #cleaner to make new one for each model
         manager = Manager(model_config,project_settings)
         data = manager.load_clean_datasets('train_val',project_settings)
-        model = models[model_name]
         cv = CrossValidator(model_config, project_settings)
         cv_num_folds = det_num_cv_folds(model_config, project_settings)
         if cv_num_folds > 1:
             print("Next Step: estimate generalization error for some metrics using CV")
-            entries = cv.perform_cross_validation(data, model)
+            entries = cv.perform_cross_validation(data, model_config)
             report.add_entries_to_report(entries)
         else:
             print("CV folds set to less than 2. No CV performed. ",end="")
@@ -67,6 +66,7 @@ def main():
             X_train_p, y_train_p = le.remove_leaking_indices(X_train_p, y_train_p)
         print("Validation dataset finalized. Training with " + str(len(X_train_p)) + " samples. Validation data with " +\
               str(len(X_val_p)) + " samples. Model with " + str(X_val_p.shape[1]) + " features. Now fitting model... ",end="")
+        model = configure_algorithm(model_config, project_settings)
         model.fit(X_train_p, y_train_p)
         print('Model Fit.\nNext Step: Perform Model Evaluation')
         y_pred = model.predict(X_val_p)

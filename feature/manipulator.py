@@ -1,10 +1,9 @@
 import inspect
 import pandas as pd
 import os
-import algorithms.wrapper
 
 from django.utils.text import slugify
-from utils import find_project_dir, flip_dict, load_clean_input_file_filepath
+from utils import find_project_dir, flip_dict, load_clean_input_file_filepath, load_inv_column_map
 
 
 class Manipulator(object):
@@ -25,15 +24,9 @@ class Manipulator(object):
         manipulator_names = [d.keys()[0] for d in manipulations]
         manipulator_map = dict(zip(manipulator_names, range(len(manipulator_names))))
         self.manipulator_map = manipulator_map
-        if not issubclass(self.__class__, (ManipulatorChain, algorithms.wrapper.Wrapper)):
-            m_order = manipulator_map[manipulator_id]
-            if m_order == 0:
-                prior_manipulator = None
-                prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-            else:
-                ord_manip_lookup = flip_dict(manipulator_map)
-                prior_manipulator = ord_manip_lookup[m_order - 1]
-                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_manipulator)
+        if not issubclass(self.__class__, ManipulatorChain):
+            prior_manipulator_feature_names_filepath = self._det_prior_features_filepath(manipulator_id, manipulations,
+                                                                                         project_settings)
             self.prior_manipulator_feature_names_filepath = prior_manipulator_feature_names_filepath
 
     def _det_output_features_filepath(self,manipulator_name):
@@ -43,6 +36,20 @@ class Manipulator(object):
         artifact_dir = self.artifact_dir
         output_features_filepath = artifact_dir + '/' + model_name_prefix + '-' + slugify(manipulator_name.replace('_', '-')) + '-features.txt'
         return output_features_filepath
+
+    def _det_prior_features_filepath(self,manipulator_name, manipulations, project_settings):
+        assert len(manipulations) != 0
+        manipulator_map = self.manipulator_map
+        manipulator_name = self.manipulator_name
+        m_order = manipulator_map[manipulator_name]
+        if m_order == 0:
+            prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
+        else:
+            ord_manip_lookup = flip_dict(manipulator_map)
+            prior_manipulator_name = ord_manip_lookup[m_order - 1]
+            prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_manipulator_name)
+        return prior_manipulator_feature_names_filepath
+
 
     def output_features(self):
         manipulator_name = self.manipulator_name
@@ -77,6 +84,12 @@ class Manipulator(object):
         assert ni == len(new_features) + len(untouched_indices)
         return new_col_map
 
+    def load_prior_features(self):
+        prior_transform_feature_names_filepath = self.prior_manipulator_feature_names_filepath
+        prior_inv_col_map = load_inv_column_map(prior_transform_feature_names_filepath)
+        prior_features = flip_dict(prior_inv_col_map)
+        return prior_features
+
 class ManipulatorChain(Manipulator):
 
     def __init__(self, manipulator_id, manipulations, model_config, project_settings):
@@ -94,6 +107,9 @@ class ManipulatorChain(Manipulator):
         raise NotImplementedError
 
     def transform(self,X_mat,y):
+        raise NotImplementedError
+
+    def load_prior_features(self):
         raise NotImplementedError
     
     def _get_args(self, class_, method):

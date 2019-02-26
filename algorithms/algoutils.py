@@ -2,21 +2,14 @@ import importlib
 
 from algorithms.wrapper import Wrapper
 
-
-def configure_algorithms(model_configs, project_settings):
-    models = model_configs['Models']
-    algos = dict()
-    for model_name in models:
-        model_config = models[model_name]
-        model_config['model_name'] = model_name
-        base_algorithm = models[model_name]['base_algorithm']
-        base_algo_class = get_algo_class(base_algorithm)
-        if 'algorithms' not in base_algorithm:
-            base_algo_instance = Wrapper(base_algo_class, model_config, project_settings) #Wrapper is used for algos implemented by others, i.e. sklearn
-        else:
-            base_algo_instance = base_algo_class(model_config, project_settings)
-        algos[model_name] = base_algo_instance
-    return algos
+def configure_algorithm(model_config, project_settings):
+    base_algorithm = model_config['base_algorithm']
+    base_algo_class = get_algo_class(base_algorithm)
+    if 'algorithms' not in base_algorithm:
+        base_algo_instance = Wrapper('final_algorithm', base_algo_class, model_config, project_settings)  #Wrapper is used for algos implemented by others, i.e. sklearn
+    else:
+        base_algo_instance = base_algo_class('final_algorithm', model_config, project_settings)
+    return base_algo_instance
 
 def get_algo_class(base_algorithm):
     module_comps = base_algorithm.split('.')

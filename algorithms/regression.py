@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from wrapper import Wrapper
-from algorithms.common import PassThrough
+from common import DecisionTree
 from sklearn import ensemble
 from sklearn import tree
 from django.utils.text import slugify
@@ -12,9 +12,9 @@ from django.utils.text import slugify
 
 class RandomForestRegressor(Wrapper):
 
-    def __init__(self, model_config, project_settings):
+    def __init__(self, wrapper_id, base_algorithm_class, model_config='algorithm'):
         base_algo_class = ensemble.RandomForestRegressor
-        super(RandomForestRegressor, self).__init__(base_algo_class, model_config, project_settings)
+        super(RandomForestRegressor, self).__init__(wrapper_id, base_algo_class, model_config, project_settings)
 
     def gen_output(self):
         assert hasattr(self,'feature_importances_')
@@ -48,8 +48,8 @@ class RandomForestRegressor(Wrapper):
         model_name = self.model_name
         f.savefig(artifact_dir + '/' + slugify(model_name) + 'feature-importance-plot.pdf')
 
-class DecisionTreeRegressor(Wrapper):  ##TODO: Can this be taken out? Because it doesn't implement anything beyond OTB sklearn functionality?
+class DecisionTreeRegressor(DecisionTree):
 
-    def __init__(self, model_config, project_settings, mode='algorithm'):
+    def __init__(self, wrapper_id, model_config, project_settings):
         base_algo_class = tree.DecisionTreeRegressor
-        super(DecisionTreeRegressor, self).__init__(base_algo_class, model_config, project_settings, mode)
+        super(DecisionTreeRegressor, self).__init__(wrapper_id, base_algo_class, model_config, project_settings)

@@ -50,7 +50,6 @@ class Manager:
                 chain = TransformChain('_' + str(counter - 1) + '_tc_', chain_manipulations, model_config, project_settings)
             else:
                 chain = FilterChain('_' + str(counter - 1) + '_fc_', chain_manipulations, model_config, project_settings)
-                pass
             chain_of_chains.append(chain)
             counter += 1
 
@@ -84,8 +83,11 @@ class Manager:
 
         assert X.shape[0] == len(y)
 
-        for chain in chain_of_chains:
-            X_t, y_t = chain.fit_transform(X, y, dataset_name)
+        if len(chain_of_chains) > 0:
+            for chain in chain_of_chains:
+                X_t, y_t = chain.fit_transform(X, y, dataset_name)
+        else:
+            X_t, y_t = X, y
 
         assert X_t.shape[0] == len(y_t)
 
@@ -96,8 +98,11 @@ class Manager:
 
         chain_of_chains = self.chain_of_chains
 
-        for chain in chain_of_chains:
-            X_t, y_t = chain.transform(X, y, dataset_name)
+        if len(chain_of_chains) > 0:
+            for chain in chain_of_chains:
+                X_t, y_t = chain.transform(X, y, dataset_name)
+        else:
+            X_t, y_t = X, y
 
         return X_t, y_t
 
@@ -148,14 +153,17 @@ class LeakEnforcer:
 
     def check_for_leak(self,X_mat):
         manipulator_map = self.manipulator_map
-        initialized_manipulators = [item['initialized_manipulator'] for item in manipulator_map.values()]
-        self.check_consistent_folds(initialized_manipulators)
-        manipulator_i = initialized_manipulators[0]
-        folds_map = manipulator_i.model_config['folds_map']
-        fold_i =  manipulator_i.model_config['fold_i']
-        leaking_candidates = folds_map[fold_i][1]
-        if len(set(leaking_candidates).intersection(X_mat.index.values)) > 0:
-            return True
+        if len(manipulator_map) > 0:
+            initialized_manipulators = [item['initialized_manipulator'] for item in manipulator_map.values()]
+            self.check_consistent_folds(initialized_manipulators)
+            manipulator_i = initialized_manipulators[0]
+            folds_map = manipulator_i.model_config['folds_map']
+            fold_i =  manipulator_i.model_config['fold_i']
+            leaking_candidates = folds_map[fold_i][1]
+            if len(set(leaking_candidates).intersection(X_mat.index.values)) > 0:
+                return True
+            else:
+                return False
         else:
             return False
 

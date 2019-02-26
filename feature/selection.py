@@ -6,7 +6,9 @@ from manipulator import ManipulatorChain, Manipulator
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
 from algorithms.classification import DecisionTreeClassifier
 from algorithms.regression import DecisionTreeRegressor
+from algorithms.common import DecisionTree
 
+from sklearn import tree
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import LogisticRegression
@@ -185,16 +187,14 @@ class tree_based(Filter):
     def __init__(self, filter_id, model_config, project_settings):
         super(tree_based, self).__init__(filter_id, model_config, project_settings)
         tree_model_config = self.fetch_filter_settings('tree_based')
-        tree_model_config['feature_settings'] = model_config['feature_settings']
-        tree_model_config['model_name'] = model_config['model_name'] + '-tree-based-feature-selection'
         method = tree_model_config['method']
         if method == 'classification':
-            model = DecisionTreeClassifier(tree_model_config, project_settings, mode='filter')
-            #TODO: Consider parameterizing this to use diff algo, i.e. Regression?
+            base_algorithm_class = tree.DecisionTreeClassifier
         elif method == 'regression':
-            model = DecisionTreeRegressor(tree_model_config,project_settings,mode='filter')
+            base_algorithm_class = tree.DecisionTreeRegressor
         else:
             raise NotImplementedError
+        model = DecisionTree(filter_id, base_algorithm_class, model_config, project_settings)
         setattr(self,'model',model)
 
 
