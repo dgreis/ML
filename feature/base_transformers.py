@@ -145,7 +145,7 @@ class OOSPredictorEns:
         folds_map_copy = dict(zip(folds_map.keys(),[list(v) for v in folds_map.copy().values()]))
         for fold_i in other_folds:
             oos_fitted_ensemble[fold_i] = dict()
-            folds_map_copy = self.filter_excluded_indices(folds_map_copy,fold_i, excluded_indices)
+            folds_map_copy = self.filter_excluded_dev_indices(folds_map_copy, fold_i, excluded_indices)
             if len(excluded_indices) > 0:
                 assert len(folds_map_copy[fold_i][0]) < len(folds_map[fold_i][0])
             ind_dev = folds_map_copy[fold_i][0]
@@ -163,7 +163,7 @@ class OOSPredictorEns:
                 oos_fitted_ensemble[fold_i][algo_name] = algo_instance
         self.oos_fitted_ensemble = oos_fitted_ensemble
 
-    def transform(self, X_touch, dataset_name):
+    def transform(self, X_touch, y_touch, dataset_name):
         assert type(self.oos_fitted_ensemble) != None
         oos_fitted_ensemble = self.oos_fitted_ensemble
         ens_algos = self.ens_algos
@@ -175,15 +175,17 @@ class OOSPredictorEns:
             for algo_name in ens_algos:
                 ens_algo_cols[algo_name] = pd.Series()
                 len_col = len(ens_algo_cols[algo_name])
+                target_idxs = list()
                 for fold_i in working_folds:
                     target_idx = folds_map[fold_i][1]
-                    X_f = X_touch.ix[target_idx,:]
+                    X_f = X_touch.loc[target_idx,:]
                     target_algo_instance = oos_fitted_ensemble[fold_i][algo_name]
                     y_hat_vals = target_algo_instance.predict(X_f)
                     y_hat_col_target_idx = pd.Series(y_hat_vals,index=target_idx)
                     ens_algo_cols[algo_name] = ens_algo_cols[algo_name].append(y_hat_col_target_idx)
                     assert len(ens_algo_cols[algo_name]) == len_col + len(target_idx)
                     len_col = len(ens_algo_cols[algo_name])
+                    target_idxs = target_idxs + target_idx
         else:
             #TODO: Check this logic for leakage and fix if needed. Now it's method seen in Sverigne's NB on Kaggle
             ens_algo_cols = dict()
@@ -192,14 +194,22 @@ class OOSPredictorEns:
                 mean_fitted_values = np.column_stack([model.predict(X_touch) for model in all_fitted_algo_name_algos]).mean(axis=1)
                 assert len(mean_fitted_values) == len(X_touch)
                 ens_algo_cols[algo_name] = mean_fitted_values
-        X_touched = pd.DataFrame(ens_algo_cols,index=X_touch.index)
-        assert len(X_touched) == len(X_touch)
+            target_idxs = X_touch.index
+        X_touched = pd.DataFrame(ens_algo_cols,index=target_idxs)
+        if self.allow_peeking:
+            assert len(X_touched) == len(X_touch)
+        else:
+            pass
         num_cols = X_touched.shape[1]
         assert num_cols == len(ens_algos)
         X_touched.columns = range(num_cols)
-        return X_touched
+        if not self.allow_peeking:
+            y_touched = pd.Series(y_touch,index=X_touch.index).loc[target_idxs].tolist()
+        else:
+            y_touched = y_touch
+        return X_touched, y_touched
 
-    def filter_excluded_indices(self, folds_map_copy, fold_i, excluded_indices):
+    def filter_excluded_dev_indices(self, folds_map_copy, fold_i, excluded_indices):
         fold_dev_ind = folds_map_copy[fold_i][0]
         folds_map_copy[fold_i][0] = filter(lambda x: x not in excluded_indices, fold_dev_ind)
         return folds_map_copy
@@ -250,16 +260,19 @@ class Stacker:
             y_hat = stacker_algo_full.predict(X_touch)
             return y_hat
 
-class Deleter(object):
+class Deleter:
 
     def __init__(self):
-        super(Deleter, self).__init__()
+        pass
 
     def fit(self,X_touch,y_touch):
         pass
 
-    def transform(self,X_touch):
-        return pd.DataFrame(index=X_touch.index)
+    def transform(self,X_touch,y_touch=None):
+        if y_touch is None:
+            return pd.DataFrame(index=X_touch.index)
+        else:
+            return pd.DataFrame(), list()
 
 class Truncator:
 
@@ -283,6 +296,22 @@ class Truncator:
 
     def transform(self,X_touch, y_touch):
         return pd.DataFrame(), list()
+
+class Imputer:
+
+    def __init__(self, strategy):
+        self.strategy = strategy
+
+    def fit(self, X_col, y): #TODO: Make this only an x acceptor, like Truncator above
+        pass
+
+    def transform(self, X_touch):
+        strategy = self.strategy
+        if strategy == 'zeros':
+            X_touched = X_touch.iloc[:,0].where(pd.notnull(X_touch.iloc[:,0]),other=0)
+        else:
+            raise Exception
+        return X_touched
 
 class Identity:
 

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import importlib
 
 import pandas as pd
@@ -5,7 +7,7 @@ import numpy as np
 
 from collections import OrderedDict
 
-from feature.engineering import TransformChain
+from feature.engineering import TransformChain, Cleaner, delete_obs
 from feature.selection import FilterChain
 from utils import find_data_dir, load_clean_input_file_filepath, load_inv_column_map, flip_dict
 
@@ -59,9 +61,8 @@ class Manager:
         initialized_manipulators = list()
         for chain in chain_of_chains:
             initialized_manipulators = initialized_manipulators + chain.manipulations
-        leak_enforcer = LeakEnforcer(initialized_manipulators)
+        leak_enforcer = LeakEnforcer(initialized_manipulators, model_config)
         self.leak_enforcer = leak_enforcer
-        self.return_train_val = leak_enforcer.has_peekers
 
         for chain in chain_of_chains:
             chain.set_leak_enforcer(leak_enforcer) #TODO: Any reason for this to be separate loop?
@@ -72,7 +73,7 @@ class Manager:
         model_config = self.model_config
         folds_map = model_config['folds_map']
         ind_dev, ind_val = folds_map[fold_num]
-        if self.return_train_val:
+        if self.leak_enforcer.has_peekers:
             return np.append(ind_dev,ind_val), ind_val
         else:
             return ind_dev, ind_val
@@ -133,9 +134,54 @@ class Manager:
 
         return data
 
+    def handle_missing_data(self, X, y):
+        #TODO: Don't forget that you probably broke Horizontal Transformer combine.
+        model_config = self.model_config
+        project_settings = self.project_settings
+        manipulations = model_config['feature_settings']['manipulations']
+        try:
+            first_manipulator_id = manipulations[0].keys()[0]
+            first_manipulator_instance = manipulations[0][first_manipulator_id]['initialized_manipulator']
+            if issubclass(first_manipulator_instance.__class__, Cleaner):
+                has_cleaner = True
+            else:
+                has_cleaner = False
+        except IndexError:
+            has_cleaner = False
+        le = self.leak_enforcer
+        if not has_cleaner:
+            delete_obs_entry = { 'auto.delete_obs': { 'inclusion_patterns' : 'All' }}
+            model_config['feature_settings']['manipulations'] = [delete_obs_entry] + manipulations
+            auto_delete_tc = TransformChain('auto_delete_tc', [delete_obs_entry],
+                                            model_config, project_settings)
+            le.update_manipulations([delete_obs_entry])
+            auto_delete_tc.set_leak_enforcer(le)
+            X, y = auto_delete_tc.fit_transform(X, y, 'train')
+        else:
+            i = self._find_last_cleaner(manipulations)
+            cleaners = manipulations[0:i]
+            cleaners_tc = TransformChain('cleaners_tc', cleaners, model_config, project_settings)
+            le.update_manipulations(manipulations)
+            cleaners_tc.set_leak_enforcer(le)
+            X, y = cleaners_tc.fit_transform(X, y, 'train')
+        return X, y
+
+    def _find_last_cleaner(self, manipulations):
+        i = 0
+        manipulator_id = manipulations[i].keys()[0]
+        manipulator_instance = manipulations[i][manipulator_id]['initialized_manipulator']
+        while issubclass(manipulator_instance.__class__, Cleaner):
+            i += 1
+            try:
+                manipulator_id = manipulations[i].keys()[0]
+            except IndexError:
+                return i
+            manipulator_instance = manipulations[i][manipulator_id]['initialized_manipulator']
+        return i
+
 class LeakEnforcer:
 
-    def __init__(self, manipulations_list):
+    def __init__(self, manipulations_list, model_config):
         manipulator_map = dict()
         has_peekers = False
         for i in range(len(manipulations_list)):
@@ -143,25 +189,30 @@ class LeakEnforcer:
             manipulator_name = manipulator_entry.keys()[0]
             initialized_manipulator = manipulator_entry[manipulator_name]['initialized_manipulator']
             manipulator_peeking_status = initialized_manipulator.validation_peeking
-            manipulator_map[manipulator_name] = { 'initialized_manipulator' : initialized_manipulator,
+            manipulator_map[manipulator_name] = { 'initialized_manipulator' : initialized_manipulator, #TODO: Why did I put initialized manipulator here?
                                                   'manipulator_peeking_status' : manipulator_peeking_status
                                                 }
         if True in [item['manipulator_peeking_status'] for item in manipulator_map.values()]:
             has_peekers = True
+        self.model_config = model_config
         self.manipulator_map = manipulator_map
         self.has_peekers = has_peekers
 
     def check_for_leak(self,X_mat):
-        manipulator_map = self.manipulator_map
-        if len(manipulator_map) > 0:
-            initialized_manipulators = [item['initialized_manipulator'] for item in manipulator_map.values()]
-            self.check_consistent_folds(initialized_manipulators)
-            manipulator_i = initialized_manipulators[0]
-            folds_map = manipulator_i.model_config['folds_map']
-            fold_i =  manipulator_i.model_config['fold_i']
-            leaking_candidates = folds_map[fold_i][1]
-            if len(set(leaking_candidates).intersection(X_mat.index.values)) > 0:
-                return True
+        model_config = self.model_config
+        if model_config.has_key('folds_map'):
+            manipulator_map = self.manipulator_map
+            if len(manipulator_map) > 0:
+                initialized_manipulators = [item['initialized_manipulator'] for item in manipulator_map.values()]
+                self.check_consistent_folds(initialized_manipulators)
+                manipulator_i = initialized_manipulators[0]
+                folds_map = manipulator_i.model_config['folds_map']
+                fold_i =  manipulator_i.model_config['fold_i']
+                leaking_candidates = folds_map[fold_i][1]
+                if len(set(leaking_candidates).intersection(X_mat.index.values)) > 0:
+                    return True
+                else:
+                    return False
             else:
                 return False
         else:
@@ -170,6 +221,22 @@ class LeakEnforcer:
     def check_leak_allowed(self,manipulator_name):
         manipulator_map = self.manipulator_map
         return manipulator_map[manipulator_name]['manipulator_peeking_status']
+
+    def update_manipulations(self, updated_manipulations):
+        manipulator_map = self.manipulator_map
+        for manipulator_entry in updated_manipulations:
+            manipulator_id = manipulator_entry.keys()[0]
+            initialized_manipulator = manipulator_entry[manipulator_id]['initialized_manipulator']
+            manipulator_peeking_status = initialized_manipulator.validation_peeking
+            if manipulator_id not in manipulator_map.keys():
+                manipulator_map[manipulator_id] = { 'initialized_manipulator': initialized_manipulator,
+                                                    'manipulator_peeking_status': manipulator_peeking_status }
+        if True in [item['manipulator_peeking_status'] for item in manipulator_map.values()]:
+            updated_self_peekers = True
+            self.has_peekers = updated_self_peekers
+        else:
+            pass
+        self.manipulator_map = manipulator_map
 
     def check_consistent_folds(self, initialized_manipulators):
         manipulator_folds_map = dict()

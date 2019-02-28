@@ -54,13 +54,13 @@ def main():
             folds_map = cv.gen_folds_map(X_train_val, y_train_val, implied_folds)  #TODO: Maybe make me specify if I don't do CV
             model_config['folds_map'] = folds_map
             model_config['fold_i'] = implied_folds - 1
+        X_train_val, y_train_val = manager.handle_missing_data(X_train_val, y_train_val)
         ind_dev, ind_val = manager.return_fold_dev_val_ind(model_config['fold_i'])
-        X_train, y_train = X_train_val.loc[ind_dev, :], pd.Series(y_train_val).loc[ind_dev].tolist()
+        X_train, y_train = X_train_val.loc[ind_dev, :], pd.Series(y_train_val, index=X_train_val.index).loc[ind_dev].tolist()
         X_train_p, y_train_p = manager.fit_transform(X_train, y_train, 'train')
-        X_val, y_val = X_train_val.loc[ind_val, :], pd.Series(y_train_val).loc[ind_val].tolist()
+        X_val, y_val = X_train_val.loc[ind_val, :], pd.Series(y_train_val, index=X_train_val.index).loc[ind_val].tolist()
         X_val_p, y_val_p = manager.transform(X_val, y_val, 'val')
         assert X_train_p.shape[1] == X_val_p.shape[1]
-        assert len(y_val_p) == len(y_val)
         le = manager.leak_enforcer
         if le.check_for_leak(X_train_p):
             X_train_p, y_train_p = le.remove_leaking_indices(X_train_p, y_train_p)
@@ -85,17 +85,14 @@ def main():
             report_row['metric'] = metric_name
             metric_class = evaluation_battery[metric_name]['class']
             kwargs = evaluation_battery[metric_name]['kwargs']
-            try:
-                content = metric_class(y_pred, y_val,**kwargs)
-            except ValueError:
-                content = np.nan
+            content = metric_class(y_pred, y_val_p, **kwargs)
             report_row['content'] = content
             report.add_entries_to_report(report_row)
         if model_config['evaluate_testset']:
             #TODO: implement this
             X_test,y_test = manager.load_clean_datasets('test',project_settings)['test']
+            X_test,y_test = manager.handle_missing_data(X_test,y_test)
             X_test_p,y_test_p = manager.transform(X_test,y_test,'test')
-            assert y_test == y_test_p
             y_pred = model.predict(X_test_p)
             for metric_name in evaluation_battery:
                 report_row['dataset_name'] = 'test'

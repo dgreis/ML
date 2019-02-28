@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Truncator, Deleter, Identity, \
-    Sampler, Stacker, OOSPredictorEns, MetaModeler
+    Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer
 from manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -30,7 +30,7 @@ class TransformChain(ManipulatorChain):
             transformer_id = transformer_entry.keys()[0]
             transformer_class_name = transformer_entry.keys()[0].split('.')[-1:][0]
             transformer_class = getattr(engineering_module, transformer_class_name)
-            if transformer_class.__bases__[0] == getattr(engineering_module,'TransformChain'):
+            if issubclass(transformer_class, TransformChain):
                 transform_chain_class = transformer_class
                 tc = transform_chain_class(transformer_id, starting_transformations, model_config, project_settings)
                 updated_transformations = tc.transformations
@@ -88,13 +88,18 @@ class TransformChain(ManipulatorChain):
                 for arg in additional_args:
                     cmkwargs[arg] = eval(arg)
                 X_transform, y_transform = transformer.combine(X_touched, X_untouched, y_touched, y_untouched,**cmkwargs) #TODO: clean up this kwarg loading mess
-                assert True not in pd.isnull(X_transform).any(1).value_counts() #TODO: pandas dependent
                 if dataset_name == "train":
                     if transformer.store:
                         artifact_dir = self.artifact_dir
                         transformer.store_output(X_transform,output_dir=artifact_dir)
                 X_mat, y = X_transform, y_transform
                 i += 1
+            try:
+                assert True not in pd.isnull(X_transform).any(1).value_counts()  # TODO: pandas dependent
+            except AssertionError:
+                print "\tIf you specified a handle_missing_data transformer, your strategy didn't succeed in handling " \
+                      "all the missing data. Consider\n adding a catch-all 'delete_obs as your final sub_transformer"
+                raise Exception
         return X_transform, y_transform
 
     def fit_transform(self,X_mat,y,dataset_name):
@@ -138,20 +143,23 @@ class Transformer(Manipulator):
     def __init__(self, transformer_id, model_config, project_settings):
         super(Transformer, self).__init__(transformer_id, model_config, project_settings)
         transformer_name = self.manipulator_name
-        transformer_settings = self.fetch_transform_settings(model_config,transformer_name)
-        self.base_transformer = None
-        if transformer_settings.has_key('kwargs'):
-            kwargs = transformer_settings['kwargs']
+        if issubclass(self.__class__, ManipulatorChain):
+            pass
         else:
-            kwargs = dict()
-        self.kwargs = kwargs
-        if transformer_settings.has_key('store_output'):
-            self.store = True
-        else:
-            self.store = False
-        self.inclusion_patterns = transformer_settings['inclusion_patterns']
-        self.exclusion_flag = False
-        self.creates_numeric_column = True
+            transformer_settings = self.fetch_transform_settings(model_config,transformer_name)
+            self.base_transformer = None
+            if transformer_settings.has_key('kwargs'):
+                kwargs = transformer_settings['kwargs']
+            else:
+                kwargs = dict()
+            self.kwargs = kwargs
+            if transformer_settings.has_key('store_output'):
+                self.store = True
+            else:
+                self.store = False
+            self.inclusion_patterns = transformer_settings['inclusion_patterns']
+            self.exclusion_flag = False
+            self.creates_numeric_column = True
 
     def configure_features(self):
         prior_features = self.load_prior_features()
@@ -353,10 +361,22 @@ class HorizontalTransformer(Transformer):
         "This is a vertical combine instead of the default horizontal"
         if dataset_name == "train":
             X_transform = X_untouched.append(X_touched,ignore_index=False)
-            y_transform = y_touched + y_untouched
+            assert len(X_transform) > 0
+            assert not pd.Series(X_transform.index).duplicated().any()
+            y_touched_ser = pd.Series(y_touched, index=X_touched.index)
+            y_untouched_ser = pd.Series(y_untouched, index=X_untouched.index)
+            y_transform_ser = y_touched_ser.append(y_untouched_ser, ignore_index=False)
+            assert not pd.Series(y_transform_ser.index).duplicated().any()
+            y_transform = y_transform_ser.tolist()
             return X_transform, y_transform
         else:
             return X_untouched, y_untouched
+
+class Cleaner(Transformer):
+
+    #TODO: Figure out multiple inheritance here to set validation_peeking attribute once for all Cleaners
+    def __init(self):
+        pass
 
 class basis_expansion(Transformer):
     """
@@ -804,12 +824,13 @@ class oos_predictor_ensemble(Transformer):
 
     def transform(self, X_touch, y_touch, dataset_name):
         oospredens_instance = self.base_transformer
-        X_t = oospredens_instance.transform(X_touch, dataset_name)
+        X_touched, y_touched = oospredens_instance.transform(X_touch, y_touch, dataset_name)
         ow = X_touch.shape[1]
-        X_t.columns = np.arange(ow,ow+X_t.shape[1],1)
-        X_touched = pd.concat([X_touch,X_t],axis=1)
-        assert X_touched.shape[1] == X_touch.shape[1] + X_t.shape[1]
-        return X_touched, y_touch
+        X_touched.columns = np.arange(ow,ow+X_touched.shape[1],1)
+        X_touched = pd.concat([X_touch,X_touched],axis=1,join='inner')
+        num_ensemble_algos = len(oospredens_instance.ens_algos)
+        assert X_touched.shape[1] == X_touch.shape[1] + num_ensemble_algos
+        return X_touched, y_touched
 
     def gen_new_column_names(self, touch_indices, prior_features):
         ens_algos = self.ens_algos
@@ -1105,7 +1126,7 @@ class drop_outliers(TransformChain):
             i += 1
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(drop_outliers, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
-
+#TODO: Figure out whether this can also be part of data pre-processing
 class ind_drop_outliers(HorizontalTransformer):
 
     def __init__(self, transformer_id, model_config, project_settings):
@@ -1130,3 +1151,95 @@ class ind_drop_outliers(HorizontalTransformer):
         assert len(touch_indices) + len(untouched_indices) == len(X_col)
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
+
+class delete_obs(HorizontalTransformer, Cleaner):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(delete_obs, self).__init__(transformer_id, model_config, project_settings)
+        self.validation_peeking = True #TODO: Figure out how to make multiple inheritance work so Cleaner is only place this needs to be stated
+        self.null_col_names = None
+        self.set_base_transformer(Deleter())
+
+    def fit(self, X, y):
+        #Now check for any missing columns
+        if pd.isnull(X).any(0).any():
+            init_features = self.load_prior_features()
+            null_col_indices = {k:v for k,v in pd.isnull(X).any(0).to_dict().items() if v == True}.keys()
+            null_col_names = [init_features[i] for i in null_col_indices]
+            self.null_col_names = null_col_names
+            null_col_namelist_str = (', ').join([init_features[i] for i in null_col_indices])
+            print("\tMissing data found for variables: " + null_col_namelist_str + ". Rows with missing data are dropped.")
+            print("\tConsider an imputation strategy to keep this data. See handle_missing_data in features/engineering.py")
+            touch_indices = {k:v for k,v in pd.isnull(X).any(1).to_dict().items() if v == True}.keys()
+            untouched_indices = {k:v for k,v in pd.isnull(X).any(1).to_dict().items() if v == False}.keys()
+        else:
+            touch_indices = []
+            untouched_indices = X.index
+        self.touch_indices = touch_indices
+        self.untouched_indices = untouched_indices
+        assert len(touch_indices) != len(X)
+
+class impute_vars(TransformChain, Cleaner):
+
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        impute_vars_entry = self.fetch_transform_chain_settings(model_config)
+        inclusion_patterns = impute_vars_entry['inclusion_patterns']
+        strategy = impute_vars_entry['strategy']
+        i = 0
+        expanded_transformations = list()
+        for pattern in inclusion_patterns:
+            transformation_dict = dict()
+            transformation_dict['int' + str(i) + '.' + 'ind_impute_var'] = {
+                'inclusion_patterns': [pattern],
+                'strategy': strategy
+            }
+            expanded_transformations.append(transformation_dict)
+            i += 1
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(impute_vars, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
+
+class ind_impute_var(Cleaner, Transformer):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_impute_var, self).__init__(transformer_id, model_config, project_settings)
+        self.validation_peeking = True
+        transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
+        strategy = transformer_settings['strategy']['replace_with']
+        self.set_base_transformer(Imputer(strategy, **self.kwargs))
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        assert len(touch_indices) == 1
+        return [prior_features[touch_indices[0]]]
+
+class handle_missing_data(TransformChain):
+    """***THIS TRANSFORMER MUST BE FIRST IN LIST OF MANIPULATIONS. DATA WILL BE DELETED IF NOT***
+    example in yaml.file
+    Model Name:
+    base_algorithm: algorithms.common.MetaModeler
+    feature_settings:
+      manipulations:
+        - handle_missing_data:
+            - delete_vars:
+                inclusion_patterns
+            - delete_obs
+                exclusion_patterns:
+            - impute_vars
+                inclusion_patterns:
+                    - 'All Numeric'
+                strategy:
+                    replace_with: 'mean'/'mode'
+            - impute_vars
+                inclusion_patterns:
+                    - some categorial variable
+                strategy:
+                    replace_with:
+                        val_this: val_that
+                        val_this: val_that
+
+    """
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        expanded_transformations = self.fetch_transform_chain_settings(model_config)
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(handle_missing_data, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)

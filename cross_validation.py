@@ -102,27 +102,35 @@ class CrossValidator:
             return report_entries[report_entries['setting'] == winning_setting]
 
     def gen_folds_map(self, X, y, num_folds):     #TODO: Make sure this shuffles the data when splitting
-        kf = KFold(num_folds)
-        folds_map = dict(zip(range(num_folds),list(kf.split(X,y))))
+        pos_ind_map = dict(zip(range(len(X)),X.index.values))
+        kf = KFold(num_folds, shuffle=True)
+        kf_split_list_of_tuples = list(kf.split(X,y))
+        kf_split_list_of_lists = [list(t) for t in kf_split_list_of_tuples ]
+        #this work below because KFold.split generates new indices. Changed with handling missing data
+        for i in range(num_folds):
+            for j in range(2):
+                ind_list = kf_split_list_of_lists[i][j]
+                kf_split_list_of_lists[i][j] = [pos_ind_map[ind] for ind in ind_list]
+        folds_map = dict(zip(range(num_folds),kf_split_list_of_lists))
         return folds_map
 
     def do_folds(self, data, model, num_folds, setting_name):
         X_train_val, y_train_val = data['train_val']
-        folds_map = self.gen_folds_map(X_train_val, y_train_val, num_folds)
-        report_entries = pd.DataFrame()
         model_config = self.model_config
         project_settings = self.project_settings
-        model_config['folds_map'] = folds_map
         manager = Manager(model_config, project_settings)
+        X_train_val, y_train_val = manager.handle_missing_data(X_train_val, y_train_val)
+        folds_map = self.gen_folds_map(X_train_val, y_train_val, num_folds)
+        report_entries = pd.DataFrame()
+        model_config['folds_map'] = folds_map
         for f in range(num_folds):
             model_config['fold_i'] = f
             ind_dev, ind_val = manager.return_fold_dev_val_ind(f)
-            X_train,y_train = X_train_val.loc[ind_dev,:], pd.Series(y_train_val).loc[ind_dev].tolist()
+            X_train, y_train = X_train_val.loc[ind_dev,:], pd.Series(y_train_val,index=X_train_val.index).loc[ind_dev].tolist()
             X_train_p, y_train_p = manager.fit_transform(X_train,y_train,'train')
-            X_val,y_val = X_train_val.loc[ind_val,:], pd.Series(y_train_val).loc[ind_val].tolist()
+            X_val,y_val = X_train_val.loc[ind_val,:], pd.Series(y_train_val,index=X_train_val.index).loc[ind_val].tolist()
             X_val_p, y_val_p = manager.transform(X_val, y_val, 'val')
             assert X_train_p.shape[1] == X_val_p.shape[1]
-            assert len(y_val_p) == len(y_val)
             le = manager.leak_enforcer
             if le.check_for_leak(X_train_p):
                 X_train_p, y_train_p = le.remove_leaking_indices(X_train_p, y_train_p)
@@ -145,10 +153,7 @@ class CrossValidator:
                 report_row['fold'] = f
                 metric_class = evaluation_battery[metric_name]['class']
                 kwargs = self._handle_kwargs(evaluation_battery[metric_name]['kwargs'])
-                try:
-                    content = metric_class(y_pred, y_val_p, **kwargs)
-                except ValueError:
-                    content = np.nan
+                content = metric_class(y_pred, y_val_p, **kwargs)
                 report_row['content'] = content
                 report_entries = report_entries.append(report_row,ignore_index=True)
             manager = Manager(model_config, project_settings)
