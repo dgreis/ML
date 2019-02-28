@@ -33,6 +33,9 @@ class TransformChain(ManipulatorChain):
             if issubclass(transformer_class, TransformChain):
                 transform_chain_class = transformer_class
                 tc = transform_chain_class(transformer_id, starting_transformations, model_config, project_settings)
+                #updated_transformations = model_config['feature_settings']['manipulations']
+                #TODO: while implementing handle_missing_data, I changed line below to one above. But it works without it
+                #TODO: (cont'd) see what impact it makes to keep it below versus change to above
                 updated_transformations = tc.transformations
             else:
                 transformer_instance = transformer_class(transformer_id, model_config, project_settings)
@@ -1199,6 +1202,7 @@ class impute_vars(TransformChain, Cleaner):
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(impute_vars, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
+#TODO: Other strategies besides 'zeros'
 class ind_impute_var(Cleaner, Transformer):
 
     def __init__(self, transformer_id, model_config, project_settings):
@@ -1212,6 +1216,8 @@ class ind_impute_var(Cleaner, Transformer):
         assert len(touch_indices) == 1
         return [prior_features[touch_indices[0]]]
 
+#TODO: implement delete/drop_vars
+#TODO: handle multiple imputation strategies, i.e. multiple impute_vars
 class handle_missing_data(TransformChain):
     """***THIS TRANSFORMER MUST BE FIRST IN LIST OF MANIPULATIONS. DATA WILL BE DELETED IF NOT***
     example in yaml.file
