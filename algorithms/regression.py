@@ -12,7 +12,7 @@ from django.utils.text import slugify
 
 class RandomForestRegressor(Wrapper):
 
-    def __init__(self, wrapper_id, base_algorithm_class, model_config='algorithm'):
+    def __init__(self, wrapper_id, model_config, project_settings):
         base_algo_class = ensemble.RandomForestRegressor
         super(RandomForestRegressor, self).__init__(wrapper_id, base_algo_class, model_config, project_settings)
 
