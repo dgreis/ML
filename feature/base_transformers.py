@@ -299,18 +299,36 @@ class Truncator:
 
 class Imputer:
 
-    def __init__(self, strategy):
-        self.strategy = strategy
+    def __init__(self, replace_with):
+        self.replace_with = replace_with
 
     def fit(self, X_col, y): #TODO: Make this only an x acceptor, like Truncator above
         pass
 
     def transform(self, X_touch):
-        strategy = self.strategy
-        if strategy == 'zeros':
+        replace_with = self.replace_with
+        if replace_with == 'zeros':
             X_touched = X_touch.iloc[:,0].where(pd.notnull(X_touch.iloc[:,0]),other=0)
         else:
             raise Exception
+        return X_touched
+
+class Recoder:
+
+    def __init__(self, val_map):
+        self.val_map = val_map
+
+    def fit(self, X):
+        pass
+
+    def transform(self,X_touch):
+        val_map = self.val_map
+        X_touched = X_touch
+        X_touched.columns = range(X_touched.shape[1])
+        for origin, target in val_map.items():
+            X_touched.iloc[:,target] = X_touched.iloc[:,origin].where( X_touched.iloc[:,origin] != X_touched.iloc[:,target],
+                                                                     other = X_touched.iloc[:,origin])
+            X_touched.fillna(1,inplace=True)
         return X_touched
 
 class Identity:
@@ -323,7 +341,6 @@ class Identity:
 
     def transform(self, X_mat):
         return X_mat
-
 
 class Sampler:
 

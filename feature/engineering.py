@@ -2,12 +2,13 @@ from __future__ import division
 
 import importlib
 import itertools
+import time
 
 import pandas as pd
 import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Truncator, Deleter, Identity, \
-    Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer
+    Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer, Recoder
 from manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -100,8 +101,16 @@ class TransformChain(ManipulatorChain):
             try:
                 assert True not in pd.isnull(X_transform).any(1).value_counts()  # TODO: pandas dependent
             except AssertionError:
-                print "\tIf you specified a handle_missing_data transformer, your strategy didn't succeed in handling " \
-                      "all the missing data. Consider\n adding a catch-all 'delete_obs as your final sub_transformer"
+                features = transformer.features
+                nis = pd.isnull(X_transform).any(0)[pd.isnull(X_transform).any(0)].index
+                still_null_cols = [features[ni] for ni in nis]
+                still_null_str = ('\n\t\t').join(still_null_cols)
+                print("\tIf you specified a handle_missing_data transformer, your strategy didn't succeed in handling " \
+                      "all the missing data. Still missing data for following cols:\n\t\t" +
+                       still_null_str +"\nConsider adding a catch-all 'delete_obs as your final sub_transformer." + \
+                       "or adding additional strategies to handle variables above.")
+                time.sleep(0.001)
+                #TODO: Figure out more helpful Exceptions. Till then, time.sleep above makes it a bit more readable
                 raise Exception
         return X_transform, y_transform
 
@@ -166,7 +175,7 @@ class Transformer(Manipulator):
 
     def configure_features(self):
         prior_features = self.load_prior_features()
-        touch_indices, untouched_indices = self.det_relevant_cols(prior_features)
+        touch_indices, untouched_indices = self.return_touch_untouched_indices(prior_features)
         try:
             assert len(touch_indices) > 0 #This check might be redundant with the one in the Transformer.fit() method
         except AssertionError:
@@ -268,7 +277,7 @@ class Transformer(Manipulator):
             raise Exception
         self.base_transformer.fit(X_mat, y)
 
-    def det_relevant_cols(self, prior_features, exclusion_flag=False):
+    def return_touch_untouched_indices(self, prior_features, exclusion_flag=False):
         assert getattr(self, 'inclusion_patterns') != None
         if hasattr(self,'exclusion_flag'):
             exclusion_flag = getattr(self,'exclusion_flag')
@@ -290,18 +299,18 @@ class Transformer(Manipulator):
                 assert model_config.has_key('numeric_features')
                 inclusion_patterns = model_config['numeric_features']
             for pattern in inclusion_patterns:
-                #len_pat = len(pattern)
-                pattern_begin_cols = filter(lambda x: x == pattern, col_names)
-                include_columns = include_columns + pattern_begin_cols
-            #non_inter_include_columns = filter(lambda x: 'x%x' not in x, include_columns)
-            #touch_indices = [int(inv_working_features[col_name]) for col_name in non_inter_include_columns]
-            #Why did I filter out interaction columns before?
+                relevant_pattern_columns = self.det_relevant_columns(pattern, col_names)
+                include_columns = include_columns + relevant_pattern_columns
             touch_indices = [int(inv_working_features[col_name]) for col_name in include_columns]
             untouched_indices = list(set(col_indices).difference(set(touch_indices)))
         if exclusion_flag:
             return untouched_indices, touch_indices
         else:
             return touch_indices, untouched_indices
+
+    def det_relevant_columns(self, pattern, col_names):
+        pattern_col = filter(lambda x: x == pattern, col_names)
+        return pattern_col
 
     def transform(self, X_touch, y_touch, **kwargs):
         """Transform Wrapper for Default (i.e. Vertical) Transformers"""
@@ -1158,21 +1167,14 @@ class ind_drop_outliers(HorizontalTransformer):
 class delete_obs(HorizontalTransformer, Cleaner):
 
     def __init__(self, transformer_id, model_config, project_settings):
+        #TODO: Implement exclusion_patterns, i.e. 'All But'. Or maybe it already works. I don't know. Figure it out
         super(delete_obs, self).__init__(transformer_id, model_config, project_settings)
         self.validation_peeking = True #TODO: Figure out how to make multiple inheritance work so Cleaner is only place this needs to be stated
-        self.null_col_names = None
         self.set_base_transformer(Deleter())
 
     def fit(self, X, y):
         #Now check for any missing columns
         if pd.isnull(X).any(0).any():
-            init_features = self.load_prior_features()
-            null_col_indices = {k:v for k,v in pd.isnull(X).any(0).to_dict().items() if v == True}.keys()
-            null_col_names = [init_features[i] for i in null_col_indices]
-            self.null_col_names = null_col_names
-            null_col_namelist_str = (', ').join([init_features[i] for i in null_col_indices])
-            print("\tMissing data found for variables: " + null_col_namelist_str + ". Rows with missing data are dropped.")
-            print("\tConsider an imputation strategy to keep this data. See handle_missing_data in features/engineering.py")
             touch_indices = {k:v for k,v in pd.isnull(X).any(1).to_dict().items() if v == True}.keys()
             untouched_indices = {k:v for k,v in pd.isnull(X).any(1).to_dict().items() if v == False}.keys()
         else:
@@ -1188,14 +1190,14 @@ class impute_vars(TransformChain, Cleaner):
         Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
         impute_vars_entry = self.fetch_transform_chain_settings(model_config)
         inclusion_patterns = impute_vars_entry['inclusion_patterns']
-        strategy = impute_vars_entry['strategy']
+        replace_with = impute_vars_entry['replace_with']
         i = 0
         expanded_transformations = list()
         for pattern in inclusion_patterns:
             transformation_dict = dict()
             transformation_dict['int' + str(i) + '.' + 'ind_impute_var'] = {
                 'inclusion_patterns': [pattern],
-                'strategy': strategy
+                'replace_with': replace_with
             }
             expanded_transformations.append(transformation_dict)
             i += 1
@@ -1209,15 +1211,91 @@ class ind_impute_var(Cleaner, Transformer):
         super(ind_impute_var, self).__init__(transformer_id, model_config, project_settings)
         self.validation_peeking = True
         transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
-        strategy = transformer_settings['strategy']['replace_with']
-        self.set_base_transformer(Imputer(strategy, **self.kwargs))
+        replace_with = transformer_settings['replace_with']
+        self.set_base_transformer(Imputer(replace_with))
 
     def gen_new_column_names(self, touch_indices, prior_features):
         assert len(touch_indices) == 1
         return [prior_features[touch_indices[0]]]
 
-#TODO: implement delete/drop_vars
-#TODO: handle multiple imputation strategies, i.e. multiple impute_vars
+class recode(Cleaner, Transformer):
+
+    #TODO: test to see what happens when recoder encounters previously unseen value. This does happen in house_prices data
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(recode, self).__init__(transformer_id, model_config, project_settings)
+        self.validation_peeking = True
+        tranformer_settings = self.fetch_transform_settings(model_config, transformer_id)
+        desc_val_map = tranformer_settings['val_map']
+        inclusion_patterns = tranformer_settings['inclusion_patterns']
+        assert len(inclusion_patterns) == 1
+        self.inclusion_patterns == inclusion_patterns
+        self.desc_val_map = desc_val_map
+        self.set_base_transformer(None)
+
+    def fit(self, X,y):
+        prior_features = self.load_prior_features()
+        touch_indices = self.touch_indices
+        inclusion_pattern = self.inclusion_patterns[0]
+        prior_feature_names = prior_features.values()
+        cat_col_names = self.det_relevant_columns(inclusion_pattern, prior_feature_names)
+        inv_col_map = flip_dict(prior_features)
+        cat_col_indices = [inv_col_map[ccn] for ccn in cat_col_names]
+        ind_min = min(cat_col_indices)
+        assert cat_col_indices == touch_indices
+        assert (cat_col_indices == np.arange(ind_min, ind_min + len(cat_col_indices), 1)).all()
+        self.fitted_indices = cat_col_indices
+        desc_val_map = self.desc_val_map
+        for suffix in desc_val_map:
+            assert inclusion_pattern + '_' + suffix in cat_col_names
+        new_col_names = self.gen_new_column_names(touch_indices, prior_features)
+        new_col_suffixes = [x.split('_')[1] for x in new_col_names]
+        lookup = dict(zip(new_col_suffixes,range(len(new_col_suffixes))))
+        val_map = dict()
+        for k,v in desc_val_map.items():
+            val_map[inv_col_map[inclusion_pattern + '_' + k]-ind_min] = lookup[v]
+            if k == 'NA':
+                na_col_ind = inv_col_map[inclusion_pattern + '_' + k]
+                #The statement below isn't always true because this transformer passes through
+                #the data even after missing data has been dealt with.
+                #TODO: Figure out if those transformers should be eliminated after manager.handle_missing_data()
+                #My feeling now is that they don't do any harm, and it avoids a mess with configuring prior features
+                #assert pd.isnull(X.loc[:,na_col_ind]).any()
+        self.set_base_transformer(Recoder(val_map))
+
+    def det_relevant_columns(self, pattern, col_names):
+        len_pat = len(pattern)
+        pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
+        non_inter_begin_cols = filter(lambda x: 'x%x' not in x, pattern_begin_cols)
+        return non_inter_begin_cols
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        desc_val_map = self.desc_val_map
+        relevant_prior_features = {k: v for k, v in prior_features.items() if k in touch_indices}
+        assert len(relevant_prior_features) == len(touch_indices)
+        num_orig_cols = len(relevant_prior_features)
+        min_col = min(relevant_prior_features.keys())
+        new_col_names = list()
+        for i in np.arange(min_col,min_col + num_orig_cols, 1):
+            col_name = relevant_prior_features[i]
+            col_prefix, col_suffix = col_name.split('_')
+            if col_suffix in desc_val_map:
+                new_suffix = desc_val_map[col_suffix]
+                new_col_name = col_prefix + '_' + new_suffix
+            else:
+                new_col_name = col_name
+            if not new_col_name in new_col_names:
+                new_col_names = new_col_names + [new_col_name]
+        return new_col_names
+
+    def transform(self, X_touch, y_touch, **kwargs):
+        fitted_indices = self.fitted_indices
+        #Try to make sure there are no new values of cat variable, though this isn't foolproof.
+        #TODO: figure out how to handle new values of cat variable in unseen data
+        assert (fitted_indices == X_touch.columns).all()
+        return super(recode, self).transform(X_touch, y_touch, **kwargs)
+
+# TODO: implement delete/drop_vars
+# TODO: handle multiple imputation strategies, i.e. multiple impute_vars
 class handle_missing_data(TransformChain):
     """***THIS TRANSFORMER MUST BE FIRST IN LIST OF MANIPULATIONS. DATA WILL BE DELETED IF NOT***
     example in yaml.file
@@ -1233,19 +1311,52 @@ class handle_missing_data(TransformChain):
             - impute_vars
                 inclusion_patterns:
                     - 'All Numeric'
-                strategy:
-                    replace_with: 'mean'/'mode'
-            - impute_vars
-                inclusion_patterns:
-                    - some categorial variable
-                strategy:
-                    replace_with:
-                        val_this: val_that
-                        val_this: val_that
+                replace_with: 'mean'/'mode'
+            - recode
+                replace_with:
+                    var_name: replacement_value
+                    var_name: replacement_value
 
     """
     def __init__(self, transform_chain_id, transformations, model_config, project_settings):
         Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
-        expanded_transformations = self.fetch_transform_chain_settings(model_config)
+        handle_missing_data_settings = self.fetch_transform_chain_settings(model_config)
+        expanded_transformations = list()
+        recode_entries = filter(lambda x: x.keys()[0] == 'recode', handle_missing_data_settings)
+        if len(recode_entries) > 0:
+            assert len(recode_entries) == 1
+            recode_entry = recode_entries[0]
+            inclusion_patterns = recode_entry['recode'].keys()
+            existing_manipulations = model_config['feature_settings']['manipulations']
+            num_existing_recoders = len(filter(lambda x: 'recode' in x.keys()[0], existing_manipulations))
+            i = 0 + num_existing_recoders
+            for pattern in inclusion_patterns:
+                replace_with = recode_entry['recode'][pattern]
+                base_col_name = pattern.split('_')[0]
+                transformer_id = str(i) + '.recode'
+                pattern_entry = { transformer_id : { 'inclusion_patterns': [base_col_name],
+                                                     'val_map': { 'NA' : replace_with }
+                                                    }
+                                }
+                expanded_transformations = expanded_transformations + [pattern_entry]
+                i += 1
+        impute_vars_entries = filter(lambda x: x.keys()[0] == 'impute_vars', handle_missing_data_settings)
+        if len(impute_vars_entries) > 0:
+            for i in range(len(impute_vars_entries)):
+                impute_vars_sub_entry = impute_vars_entries[i]
+                inclusion_patterns = impute_vars_sub_entry['impute_vars']['inclusion_patterns']
+                replace_with = impute_vars_sub_entry['impute_vars']['replace_with']
+                impute_vars_entry = { str(i) + '.impute_vars': { 'inclusion_patterns' : inclusion_patterns,
+                                                                 'replace_with': replace_with}
+                                      }
+                expanded_transformations = expanded_transformations + [impute_vars_entry]
+                i += 1
+        #TODO: Should I alert user when an imputer does nothing? i.e. there's no missing values to impute?
+        delete_obs_entries =  filter(lambda x: x.keys()[0] == 'delete_obs', handle_missing_data_settings)
+        if len(delete_obs_entries) > 0:
+            assert len(delete_obs_entries) == 1
+            delete_obs_sub_entry = delete_obs_entries[0]
+            delete_obs_entry = { '0.delete_obs': {'inclusion_patterns': 'All'}}
+            expanded_transformations = expanded_transformations + [delete_obs_entry]
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(handle_missing_data, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
