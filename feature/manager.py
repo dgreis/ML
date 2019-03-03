@@ -164,7 +164,13 @@ class Manager:
             le.update_manipulations(manipulations)
             cleaners_tc.set_leak_enforcer(le)
             X, y = cleaners_tc.fit_transform(X, y, 'train')
+
+        chain_of_chains = self.chain_of_chains
+        first_transform_chain = chain_of_chains[0]
+        first_transform_chain.transformations = manipulations[i:]
+
         return X, y
+
 
     def _find_last_cleaner(self, manipulations):
         i = 0

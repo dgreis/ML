@@ -149,17 +149,19 @@ class OOSPredictorEns:
             if len(excluded_indices) > 0:
                 assert len(folds_map_copy[fold_i][0]) < len(folds_map[fold_i][0])
             ind_dev = folds_map_copy[fold_i][0]
-            X_of = X_touch.ix[ind_dev,:]
-            y_of = pd.Series(y_touch,index=X_touch.index).ix[ind_dev]
+            #existing b/c not all indices in folds guaranteed. Other HorizontalTransformers can eliminate indices
+            ind_dev_existing = list(set(ind_dev).intersection(X_touch.index))
+            X_f = X_touch.loc[ind_dev_existing,:]
+            y_f = pd.Series(y_touch,index=X_touch.index).loc[ind_dev_existing]
             inner_excluded_indices = folds_map_copy[fold_i][1]
-            assert not pd.Series([i in X_of.index for i in inner_excluded_indices]).all()
+            assert not pd.Series([i in X_f.index for i in inner_excluded_indices]).all()
             ens_algos = self.ens_algos
             ens_algos_keyword_arg_settings_dict = self.ens_algos_keyword_arg_settings_dict
             for algo_name in ens_algos:
                 algo_keyword_arg_settings = ens_algos_keyword_arg_settings_dict[algo_name]
                 algo_class = get_algo_class(algo_name)
                 algo_instance = algo_class(**algo_keyword_arg_settings)
-                algo_instance.fit(X_of,y_of)
+                algo_instance.fit(X_f,y_f)
                 oos_fitted_ensemble[fold_i][algo_name] = algo_instance
         self.oos_fitted_ensemble = oos_fitted_ensemble
 
@@ -175,17 +177,18 @@ class OOSPredictorEns:
             for algo_name in ens_algos:
                 ens_algo_cols[algo_name] = pd.Series()
                 len_col = len(ens_algo_cols[algo_name])
-                target_idxs = list()
+                existing_target_idxs = list()
                 for fold_i in working_folds:
                     target_idx = folds_map[fold_i][1]
-                    X_f = X_touch.loc[target_idx,:]
+                    target_idx_existing = list(set(target_idx).intersection(X_touch.index))
+                    X_f = X_touch.loc[target_idx_existing,:]
                     target_algo_instance = oos_fitted_ensemble[fold_i][algo_name]
                     y_hat_vals = target_algo_instance.predict(X_f)
-                    y_hat_col_target_idx = pd.Series(y_hat_vals,index=target_idx)
+                    y_hat_col_target_idx = pd.Series(y_hat_vals,index=target_idx_existing)
                     ens_algo_cols[algo_name] = ens_algo_cols[algo_name].append(y_hat_col_target_idx)
-                    assert len(ens_algo_cols[algo_name]) == len_col + len(target_idx)
+                    assert len(ens_algo_cols[algo_name]) == len_col + len(target_idx_existing)
                     len_col = len(ens_algo_cols[algo_name])
-                    target_idxs = target_idxs + target_idx
+                    existing_target_idxs = existing_target_idxs + target_idx_existing
         else:
             #TODO: Check this logic for leakage and fix if needed. Now it's method seen in Sverigne's NB on Kaggle
             ens_algo_cols = dict()
@@ -194,8 +197,8 @@ class OOSPredictorEns:
                 mean_fitted_values = np.column_stack([model.predict(X_touch) for model in all_fitted_algo_name_algos]).mean(axis=1)
                 assert len(mean_fitted_values) == len(X_touch)
                 ens_algo_cols[algo_name] = mean_fitted_values
-            target_idxs = X_touch.index
-        X_touched = pd.DataFrame(ens_algo_cols,index=target_idxs)
+            existing_target_idxs = X_touch.index
+        X_touched = pd.DataFrame(ens_algo_cols,index=existing_target_idxs)
         if self.allow_peeking:
             assert len(X_touched) == len(X_touch)
         else:
@@ -204,7 +207,7 @@ class OOSPredictorEns:
         assert num_cols == len(ens_algos)
         X_touched.columns = range(num_cols)
         if not self.allow_peeking:
-            y_touched = pd.Series(y_touch,index=X_touch.index).loc[target_idxs].tolist()
+            y_touched = pd.Series(y_touch,index=X_touch.index).loc[existing_target_idxs].tolist()
         else:
             y_touched = y_touch
         return X_touched, y_touched

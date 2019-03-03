@@ -33,11 +33,9 @@ class TransformChain(ManipulatorChain):
             transformer_class = getattr(engineering_module, transformer_class_name)
             if issubclass(transformer_class, TransformChain):
                 transform_chain_class = transformer_class
-                tc = transform_chain_class(transformer_id, starting_transformations, model_config, project_settings)
-                #updated_transformations = model_config['feature_settings']['manipulations']
-                #TODO: while implementing handle_missing_data, I changed line below to one above. But it works without it
-                #TODO: (cont'd) see what impact it makes to keep it below versus change to above
-                updated_transformations = tc.transformations
+                #tc instance is discarded in next line because its work is done updating manipulations in model_config
+                _ = transform_chain_class(transformer_id, starting_transformations, model_config, project_settings)
+                updated_transformations = model_config['feature_settings']['manipulations']
             else:
                 transformer_instance = transformer_class(transformer_id, model_config, project_settings)
                 transformer_entry[transformer_id]['initialized_manipulator'] = transformer_instance
@@ -823,7 +821,10 @@ class oos_predictor_ensemble(Transformer):
             ens_algos.append(algo_name)
             ens_algos_keyword_arg_dict[algo_name] = algo_keyword_arg_settings
         self.ens_algos = ens_algos
-        self.validation_peeking = oos_predictor_ensemble_settings['validation_peeking']
+        validation_peeking = oos_predictor_ensemble_settings['validation_peeking']
+        #TODO: Some kind of type checking for all inputs?
+        assert validation_peeking in [True, False]
+        self.validation_peeking = validation_peeking
         self.set_base_transformer(OOSPredictorEns(ens_algos, ens_algos_keyword_arg_dict, self.validation_peeking))
         #self.configure_features()
 
@@ -1286,11 +1287,12 @@ class impute_vars(TransformChain, Cleaner):
         impute_vars_entry = self.fetch_transform_chain_settings(model_config)
         inclusion_patterns = impute_vars_entry['inclusion_patterns']
         replace_with = impute_vars_entry['replace_with']
+        chain_name_prefix = transform_chain_id.split('_')[0]
         i = 0
         expanded_transformations = list()
         for pattern in inclusion_patterns:
             transformation_dict = dict()
-            transformation_dict['int' + str(i) + '.' + 'ind_impute_var'] = {
+            transformation_dict[chain_name_prefix +'_' + str(i) + '.' + 'ind_impute_var'] = {
                 'inclusion_patterns': [pattern],
                 'replace_with': replace_with
             }
@@ -1441,7 +1443,7 @@ class handle_missing_data(TransformChain):
                 impute_vars_sub_entry = impute_vars_entries[i]
                 inclusion_patterns = impute_vars_sub_entry['impute_vars']['inclusion_patterns']
                 replace_with = impute_vars_sub_entry['impute_vars']['replace_with']
-                impute_vars_entry = { str(i) + '.impute_vars': { 'inclusion_patterns' : inclusion_patterns,
+                impute_vars_entry = { 'hmd_' + str(i) + '.impute_vars': { 'inclusion_patterns' : inclusion_patterns,
                                                                  'replace_with': replace_with}
                                       }
                 expanded_transformations = expanded_transformations + [impute_vars_entry]
@@ -1451,7 +1453,7 @@ class handle_missing_data(TransformChain):
         if len(delete_obs_entries) > 0:
             assert len(delete_obs_entries) == 1
             delete_obs_sub_entry = delete_obs_entries[0]
-            delete_obs_entry = { '0.delete_obs': {'inclusion_patterns': 'All'}}
+            delete_obs_entry = { 'hmd_0.delete_obs': {'inclusion_patterns': 'All'}}
             expanded_transformations = expanded_transformations + [delete_obs_entry]
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(handle_missing_data, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
