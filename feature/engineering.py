@@ -7,7 +7,7 @@ import time
 import pandas as pd
 import numpy as np
 
-from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Truncator, Deleter, Identity, \
+from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Deleter, Identity, \
     Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer, Recoder
 from manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
@@ -1121,7 +1121,17 @@ class include_features(Transformer):
         return list()
 
 class drop_outliers(TransformChain):
-    """TODO: Documentation?"""
+    """Example yaml
+        ...
+        feature_settings:
+         manipulations:
+          - drop_outliers:
+                inclusion_patterns:
+                    - <pattern>
+                strategy: 'IQR'
+        **NOTE: transformer doesn't currently do anything with strategy parameter. IQR is only strategy
+                implemented so far
+    """
     def __init__(self, transform_chain_id, transformations, model_config, project_settings):
         Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
         expanded_transformations = list()
@@ -1143,26 +1153,111 @@ class ind_drop_outliers(HorizontalTransformer):
 
     def __init__(self, transformer_id, model_config, project_settings):
         super(ind_drop_outliers, self).__init__(transformer_id, model_config, project_settings)
-        self.set_base_transformer(Truncator(**self.kwargs))
-        #self.configure_features()
+        self.set_base_transformer(Deleter(**self.kwargs))
+        self.lower_thresh = None
+        self.upper_thresh = None
 
     def fit(self, X_col, y):
-        X_mat_idx = X_col.index.tolist()
-        y = pd.Series(y, index=X_mat_idx)
         assert X_col.shape[1] == 1
-        ti = X_col.columns[0]
-        truncator = self.base_transformer
-        truncator.fit(X_col)
-        if pd.isnull(truncator.lthrsh):
-            X_mat_sub = X_col
+        #implementing 1.5xIQR rule for now
+        desc = X_col.describe()
+        IQR = (desc.loc['75%'] - desc.loc['25%']).values[0]
+        assert not pd.isnull(IQR)
+        if IQR == 0:
+            upper_thresh = np.nan
+            lower_thresh = np.nan
+        else:
+            upper_thresh = desc.loc['75%'].values[0] + 1.5*IQR
+            lower_thresh = desc.loc['25%'].values[0] - 1.5*IQR
+        if pd.isnull(lower_thresh):
+            X_sub = X_col
             print "\t\t" + self.inclusion_patterns[0] + " drop outliers has an IQR = 0. No observations will be dropped"
         else:
-            X_mat_sub = X_col[(X_col.loc[:, ti] > truncator.lthrsh) & (X_col.loc[:, ti] < truncator.uthrsh)].copy()
-        untouched_indices = list(X_mat_sub.index)
-        touch_indices = list(set(X_mat_idx).difference(set(untouched_indices)))
+            X_sub = X_col[(X_col.iloc[:, 0] > lower_thresh) & (X_col.iloc[:, 0] < upper_thresh)]
+        untouched_indices = list(X_sub.index)
+        touch_indices = list(set(X_col.index).difference(set(untouched_indices)))
         assert len(touch_indices) + len(untouched_indices) == len(X_col)
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
+
+class truncate(HorizontalTransformer):
+    """
+    truncate differs from drop_outliers in that it requires specific thresholds to operate.
+    drop_outliers operates according to an overall strategy, which is why it can be applied
+    to multiple columns at once.
+    sample yaml:
+    ...
+    feature_settings:
+        manipulations:
+            - truncate:
+                inclusion_patterns:
+                    - <col_name> (Should be only one column)
+                thresholds: (<lower>,<upper>)
+    """
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(truncate, self).__init__(transformer_id, model_config, project_settings)
+        transformer_settings = self.fetch_transform_settings(model_config,transformer_id)
+        inclusion_patterns = transformer_settings['inclusion_patterns']
+        col_thresh_map = dict()
+        for d in inclusion_patterns:
+            k,v = d.items()[0]
+            col_thresh_map[k] = v
+        self.col_thresh_map = col_thresh_map
+        self.set_base_transformer(Deleter(**self.kwargs))
+
+    def fit(self, X_cols, y):
+        col_thresh_map = self.col_thresh_map
+        project_settings = self.project_settings
+        target_variable = project_settings['target_variable']
+        prior_features = self.load_prior_features()
+        inv_col_map = flip_dict(prior_features)
+        conditional_clauses = list()
+        for col,thresholds in col_thresh_map.items():
+            lower_thresh, upper_thresh = thresholds
+            if col == target_variable:
+                assert len(X_cols) == len(y)
+                X_cols.loc[:, 'y'] = y
+                cc = "(X_cols.loc[:,'y'] > " + str(lower_thresh) + ") & " \
+                     "(X_cols.loc[:,'y'] < " + str(upper_thresh) + ")"
+            else:
+                cc = "(X_cols.loc[:," + str(inv_col_map[col]) + "] > " + str(lower_thresh) + ") & " \
+                     "(X_cols.loc[:," + str(inv_col_map[col]) + "] < " + str(upper_thresh )+ ")"
+            conditional_clauses = conditional_clauses + [cc]
+        conditional_statement = " | ".join(conditional_clauses)
+        X_sub = X_cols[eval(conditional_statement)]
+        untouched_indices = list(X_sub.index)
+        touch_indices = list(set(X_cols.index).difference(set(untouched_indices)))
+        assert len(touch_indices) + len(untouched_indices) == len(X_cols)
+        self.touch_indices = touch_indices
+        self.untouched_indices = untouched_indices
+
+    def return_touch_untouched_indices(self, prior_features, exclusion_flag=False):
+        #TODO: Work out a more sensible way to handle inclusion_patterns across manipulators
+        assert getattr(self, 'inclusion_patterns') != None
+        if hasattr(self,'exclusion_flag'):
+            exclusion_flag = getattr(self,'exclusion_flag')
+        include_columns = list()
+        col_indices = prior_features.keys()
+        col_names = prior_features.values()
+        inclusion_patterns = [d.keys()[0] for d in self.inclusion_patterns]
+        inv_working_features = flip_dict(prior_features)
+        if inclusion_patterns in ['All',['All']]:
+            raise Exception
+        else:
+            if type(inclusion_patterns) == dict:
+                assert inclusion_patterns.keys() == ['All But']
+                raise Exception
+            elif inclusion_patterns == "All Numeric":
+                raise Exception
+            for pattern in inclusion_patterns:
+                relevant_pattern_columns = self.det_relevant_columns(pattern, col_names)
+                include_columns = include_columns + relevant_pattern_columns
+            touch_indices = [int(inv_working_features[col_name]) for col_name in include_columns]
+            untouched_indices = list(set(col_indices).difference(set(touch_indices)))
+        if exclusion_flag:
+            return untouched_indices, touch_indices
+        else:
+            return touch_indices, untouched_indices
 
 class delete_obs(HorizontalTransformer, Cleaner):
 
@@ -1326,14 +1421,14 @@ class handle_missing_data(TransformChain):
         if len(recode_entries) > 0:
             assert len(recode_entries) == 1
             recode_entry = recode_entries[0]
-            inclusion_patterns = recode_entry['recode'].keys()
+            inclusion_patterns = recode_entry['recode']['replace_with'].keys()
             existing_manipulations = model_config['feature_settings']['manipulations']
             num_existing_recoders = len(filter(lambda x: 'recode' in x.keys()[0], existing_manipulations))
             i = 0 + num_existing_recoders
             for pattern in inclusion_patterns:
-                replace_with = recode_entry['recode'][pattern]
+                replace_with = recode_entry['recode']['replace_with'][pattern]
                 base_col_name = pattern.split('_')[0]
-                transformer_id = str(i) + '.recode'
+                transformer_id = 'hmd_' + str(i) + '.recode'
                 pattern_entry = { transformer_id : { 'inclusion_patterns': [base_col_name],
                                                      'val_map': { 'NA' : replace_with }
                                                     }
