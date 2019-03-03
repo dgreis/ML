@@ -1315,7 +1315,7 @@ class ind_impute_var(Cleaner, Transformer):
         return [prior_features[touch_indices[0]]]
 
 class recode(Cleaner, Transformer):
-
+    #TODO: Documentation?
     #TODO: test to see what happens when recoder encounters previously unseen value. This does happen in house_prices data
     def __init__(self, transformer_id, model_config, project_settings):
         super(recode, self).__init__(transformer_id, model_config, project_settings)
@@ -1348,14 +1348,10 @@ class recode(Cleaner, Transformer):
         lookup = dict(zip(new_col_suffixes,range(len(new_col_suffixes))))
         val_map = dict()
         for k,v in desc_val_map.items():
+            if v == '<Mode>':
+                mode_idx = X.loc[:,touch_indices].sum(0).idxmax() - ind_min
+                v = flip_dict(lookup)[mode_idx]
             val_map[inv_col_map[inclusion_pattern + '_' + k]-ind_min] = lookup[v]
-            if k == 'NA':
-                na_col_ind = inv_col_map[inclusion_pattern + '_' + k]
-                #The statement below isn't always true because this transformer passes through
-                #the data even after missing data has been dealt with.
-                #TODO: Figure out if those transformers should be eliminated after manager.handle_missing_data()
-                #My feeling now is that they don't do any harm, and it avoids a mess with configuring prior features
-                #assert pd.isnull(X.loc[:,na_col_ind]).any()
         self.set_base_transformer(Recoder(val_map))
 
     def det_relevant_columns(self, pattern, col_names):
@@ -1376,7 +1372,10 @@ class recode(Cleaner, Transformer):
             col_prefix, col_suffix = col_name.split('_')
             if col_suffix in desc_val_map:
                 new_suffix = desc_val_map[col_suffix]
-                new_col_name = col_prefix + '_' + new_suffix
+                if new_suffix == '<Mode>':
+                    continue
+                else:
+                    new_col_name = col_prefix + '_' + new_suffix
             else:
                 new_col_name = col_name
             if not new_col_name in new_col_names:

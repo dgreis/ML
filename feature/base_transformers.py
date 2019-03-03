@@ -309,6 +309,10 @@ class Recoder:
             X_touched.iloc[:,target] = X_touched.iloc[:,origin].where( X_touched.iloc[:,origin] != X_touched.iloc[:,target],
                                                                      other = X_touched.iloc[:,origin])
             X_touched.fillna(1,inplace=True)
+            if target != origin:
+                X_touched = X_touched.drop([origin],axis=1)
+            else:
+                pass
         return X_touched
 
 class Identity:
