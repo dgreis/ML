@@ -260,6 +260,6 @@ class LeakEnforcer:
         folds_map = manipulator_i.model_config['folds_map']
         fold_i = manipulator_i.model_config['fold_i']
         leaking_indices = folds_map[fold_i][1]
-        X_noleak = X.drop(leaking_indices)
-        y_noleak = list(pd.Series(y,index=X.index).drop(leaking_indices))
+        X_noleak = X.drop(leaking_indices, errors='ignore')
+        y_noleak = list(pd.Series(y,index=X.index).drop(leaking_indices, errors='ignore'))
         return X_noleak, y_noleak
