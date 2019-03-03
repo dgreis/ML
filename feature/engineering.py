@@ -359,7 +359,6 @@ class HorizontalTransformer(Transformer):
         else:
             return None, X_mat, None, y
 
-
     def transform(self,X_touch,y_touch,dataset_name):
         if dataset_name == "train":
             X_touched, y_touched = self.base_transformer.transform(X_touch, y_touch)

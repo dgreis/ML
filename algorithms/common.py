@@ -40,6 +40,7 @@ class PassThrough:
         pass
 
     def fit(self,X,y):
+        #TODO: Add some sort of helpful error here for when metamodeler is specified without kaggle_stack
         assert X.shape[1] == 1
 
     def predict(self,X):
