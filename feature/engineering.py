@@ -1283,11 +1283,13 @@ class impute_vars(TransformChain, Cleaner):
 
     def __init__(self, transform_chain_id, transformations, model_config, project_settings):
         Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        manipulations = model_config['feature_settings']['manipulations']
+        existing_impute_vars_entries = filter(lambda x: 'ind_impute_var' in x.keys()[0], manipulations)
         impute_vars_entry = self.fetch_transform_chain_settings(model_config)
         inclusion_patterns = impute_vars_entry['inclusion_patterns']
         replace_with = impute_vars_entry['replace_with']
         chain_name_prefix = transform_chain_id.split('_')[0]
-        i = 0
+        i = 0 + len(existing_impute_vars_entries)
         expanded_transformations = list()
         for pattern in inclusion_patterns:
             transformation_dict = dict()
@@ -1300,7 +1302,6 @@ class impute_vars(TransformChain, Cleaner):
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(impute_vars, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
-#TODO: Other strategies besides 'zeros'
 class ind_impute_var(Cleaner, Transformer):
 
     def __init__(self, transformer_id, model_config, project_settings):

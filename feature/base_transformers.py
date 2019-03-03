@@ -289,8 +289,14 @@ class Imputer:
         replace_with = self.replace_with
         if replace_with == 'zeros':
             X_touched = X_touch.iloc[:,0].where(pd.notnull(X_touch.iloc[:,0]),other=0)
+        elif replace_with == 'median':
+            median_val = X_touch.iloc[:,0].median()
+            X_touched = X_touch.iloc[:,0].where(pd.notnull(X_touch.iloc[:,0]),other=median_val)
+        elif replace_with == 'mode':
+            mode_val = X_touch.iloc[:,0].mode()
+            X_touched = X_touch.iloc[:,0].where(pd.notnull(X_touch.iloc[:,0]),other=mode_val)
         else:
-            raise Exception
+            raise NotImplementedError
         return X_touched
 
 class Recoder:
