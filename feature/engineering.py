@@ -1279,6 +1279,47 @@ class delete_obs(HorizontalTransformer, Cleaner):
         self.untouched_indices = untouched_indices
         assert len(touch_indices) != len(X)
 
+class delete_vars(TransformChain, Cleaner):
+
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        manipulations = model_config['feature_settings']['manipulations']
+        existing_delete_vars_entries = filter(lambda x: 'ind_delete_var' in x.keys()[0], manipulations)
+        delete_vars_entry = self.fetch_transform_chain_settings(model_config)
+        inclusion_patterns = delete_vars_entry['inclusion_patterns']
+        chain_name_prefix = transform_chain_id.split('_')[0]
+        i = 0 + len(existing_delete_vars_entries)
+        expanded_transformations = list()
+        for pattern in inclusion_patterns:
+            transformation_dict = dict()
+            transformation_dict[chain_name_prefix + '_' + str(i) + '.' + 'ind_delete_var'] = {
+                'inclusion_patterns': [pattern],
+            }
+            expanded_transformations.append(transformation_dict)
+            i += 1
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(delete_vars, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
+
+class ind_delete_var(Cleaner, Transformer):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_delete_var, self).__init__(transformer_id, model_config, project_settings)
+        transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
+        self.set_base_transformer(Deleter(**self.kwargs))
+
+    def fit(self, X, y):
+        pass
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        return []
+
+    def det_relevant_columns(self, pattern, col_names):
+        #TODO: Refactor/rethink this method/inheritance strategy. This is duplicated from recode
+        len_pat = len(pattern)
+        pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
+        non_inter_begin_cols = filter(lambda x: 'x%x' not in x, pattern_begin_cols)
+        return non_inter_begin_cols
+
 class impute_vars(TransformChain, Cleaner):
 
     def __init__(self, transform_chain_id, transformations, model_config, project_settings):
@@ -1448,6 +1489,13 @@ class handle_missing_data(TransformChain):
                 expanded_transformations = expanded_transformations + [impute_vars_entry]
                 i += 1
         #TODO: Should I alert user when an imputer does nothing? i.e. there's no missing values to impute?
+        delete_vars_entries = filter(lambda x: x.keys()[0] == 'delete_vars', handle_missing_data_settings)
+        if len(delete_vars_entries) > 0:
+            assert len(delete_vars_entries) == 1
+            delete_vars_sub_entry = delete_vars_entries[0]
+            inclusion_patterns = delete_vars_sub_entry['delete_vars']['inclusion_patterns']
+            delete_vars_entry = { 'hmd_0.delete_vars' : { 'inclusion_patterns': inclusion_patterns}}
+            expanded_transformations = expanded_transformations + [delete_vars_entry]
         delete_obs_entries =  filter(lambda x: x.keys()[0] == 'delete_obs', handle_missing_data_settings)
         if len(delete_obs_entries) > 0:
             assert len(delete_obs_entries) == 1
