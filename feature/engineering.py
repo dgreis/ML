@@ -926,61 +926,45 @@ class as_numeric(TransformChain):
        feature_settings:
          feature_engineering:
            - as_numeric
-               inclusion_patterns
-                 - <pattern>
                val_maps:
                  - <pattern> : { str:val, str:val,...}
     """
 
     def __init__(self, transform_chain_id, transformations, model_config, project_settings):
-        Manipulator.__init__(model_config, project_settings, transformations)
-        expanded_transformations = list()
-        transformer_names = [d.keys()[0] for d in transformations]
-        t_idx = transformer_names.index('as_numeric')
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        as_numeric_entry = self.fetch_transform_chain_settings(model_config)
+        val_maps = as_numeric_entry['val_maps']
         i = 0
-        as_numeric_entry = filter(lambda x: x.keys()[0] == 'as_numeric', transformations)[0]['as_numeric']
-        inclusion_patterns = as_numeric_entry['inclusion_patterns']
-        if as_numeric_entry.has_key('val_maps'):
-            val_maps = as_numeric_entry['val_maps']
-        else:
-            val_maps = dict()
-        for pattern in inclusion_patterns:
+        expanded_transformations = list()
+        for pattern_val_map in val_maps:
+            pattern = pattern_val_map.keys()[0]
+            val_map = pattern_val_map[pattern]
             transformation_dict = dict()
-            expanded_transformer_name = '_' + str(i) + '.' + 'ind_as_numeric'
-            transformation_dict[expanded_transformer_name] = {
+            transformation_dict[str(i) + '.' + 'ind_as_numeric'] = {
                 'inclusion_patterns': [pattern],
+                'val_map': val_map
             }
             expanded_transformations.append(transformation_dict)
             i += 1
-            if val_maps.has_key(pattern):
-                transformation_dict[expanded_transformer_name]['val_map'] = val_maps[pattern]
-        if t_idx == 0:
-            transformations = expanded_transformations + transformations[1:]
-            exp_idx = len(expanded_transformations)
-        elif t_idx < len(transformations) - 1:
-            transformations = transformations[0:t_idx] + expanded_transformations + transformations[t_idx + 1:]
-            exp_idx = len(transformations[0:t_idx]) + len(expanded_transformations)
-        else:
-            transformations = transformations[:-1] + expanded_transformations
-            exp_idx = len(transformations[:-1]) + len(expanded_transformations)
-        model_config['feature_settings']['feature_engineering'] = transformations
-        super(as_numeric, self).__init__(transformer_id, transformations[:exp_idx], model_config)
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(as_numeric, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
-#TODO: handle numeric_features here. It needs to flip from non to yes
 class ind_as_numeric(Transformer):
     """
     This is a utility transformation, used by as_numeric transformchain transformer
     """
     def __init__(self, transformer_id, model_config, project_settings):
         super(ind_as_numeric, self).__init__(transformer_id, model_config, project_settings)
-        #self.configure_features()
-        ind_as_numeric_entry = filter(lambda x: x.keys()[0] == self.manipulator_name, model_config['feature_settings']
-                        ['feature_engineering'])[0][self.manipulator_name]
-        kwargs = dict()
-        if ind_as_numeric_entry.has_key('val_map'):
-            kwargs['val_map'] = ind_as_numeric_entry['val_map']
-        self.set_base_transformer(InvOneHotEncoder(self.touch_indices, self.prior_features, **kwargs))
+        transformer_settings = self.fetch_transform_settings(model_config,transformer_id)
+        val_map = transformer_settings['val_map']
+        self.val_map = val_map
+        self.set_base_transformer(None)
 
+    def fit(self,X,y):
+        val_map = self.val_map
+        touch_indices = self.touch_indices
+        prior_features = self.load_prior_features()
+        self.set_base_transformer(InvOneHotEncoder(touch_indices, prior_features, val_map))
 
     def gen_new_column_names(self, touch_indices, prior_features):
         prior_feature_cols = [prior_features[ti] for ti in touch_indices]
@@ -989,8 +973,15 @@ class ind_as_numeric(Transformer):
         base_name = 'as_numeric(' + base_names[0] + ')'
         return [base_name]
 
+    def det_relevant_columns(self, pattern, col_names):
+        #TODO: Refactor/rethink this method/inheritance strategy. This is duplicated from recode
+        len_pat = len(pattern)
+        pattern_begin_cols = filter(lambda x: x[0:len_pat] == pattern, col_names)
+        non_inter_begin_cols = filter(lambda x: 'x%x' not in x, pattern_begin_cols)
+        return non_inter_begin_cols
+
     def transform(self, X_touch, y_touch, dataset_name):
-        return self.base_transformer.transform(X_touch,y_touch,dataset_name)
+        return self.base_transformer.transform(X_touch,dataset_name), y_touch
 
 class sample(HorizontalTransformer):
     """Example in models.yaml file:

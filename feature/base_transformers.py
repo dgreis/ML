@@ -53,7 +53,8 @@ class InvOneHotEncoder:
                 try:
                     assert val in num_column.values
                 except AssertionError:
-                    print '\t' + str(val) + " not in column for dataset:" + dataset_name + ". Possibly Tweak val_map in as_numeric transform"
+                    #print '\t' + str(val) + " not in column for dataset:" + dataset_name + ". Possibly Tweak val_map in as_numeric transform"
+                    pass
         return pd.DataFrame(num_column,index=X_touch.index)
 
 class Interpolator(interp1d):
