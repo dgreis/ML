@@ -351,3 +351,22 @@ class Sampler:
         y_touch_dict = dict(pd.Series(y_touch,index=touch_indices))
         y_touched = [y_touch_dict[ri] for ri in sampled_idx]
         return X_touched, y_touched
+
+class ExpressionEvaluator:
+
+    def __init__(self, fully_qualified_expression, keep_cols):
+        self.fully_qualified_expression = fully_qualified_expression
+        self.keep_cols = keep_cols
+
+    def fit(self,X,y):
+        pass
+
+    def transform(self,X_touch):
+        fully_qualified_expression = self.fully_qualified_expression
+        if self.keep_cols:
+            X_touch.loc[:,'nc'] = eval(fully_qualified_expression)
+            X_touched = X_touch
+        else:
+            X_touched = eval(fully_qualified_expression)
+        return X_touched
+

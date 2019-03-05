@@ -3,12 +3,13 @@ from __future__ import division
 import importlib
 import itertools
 import time
+import re
 
 import pandas as pd
 import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Deleter, Identity, \
-    Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer, Recoder
+    Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer, Recoder, ExpressionEvaluator
 from manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -440,6 +441,74 @@ class basis_expansion(Transformer):
         #    return 'inter(' + tuple[0] + 'x%x' + tuple[1] + ')'
         else:
             raise Exception
+
+class linear_combination(Transformer):
+    """
+    For now linear_combination only supports simple mathematical operators (+,-,/,*)
+    Support must still be implemented for multiplicative coefficients or power-raising.
+
+    keep_cols parameter (not required) determines whether columns specified in expression will be kept or
+    dropped. Default is to keep. expression and equals parameters are required.
+
+    sample yaml usage:
+    ...
+    manipulations:
+        - linear_combination:
+            expression: 'TotalBsmtSF + 1stFlrSF + 2ndFlrSF'
+            equals: 'NewTestCol'
+            keep_cols: False
+    """
+    def __init__(self, transformer_id, model_config, project_settings):
+        transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
+        expression = transformer_settings['expression']
+        #TODO: This will get more complicated once we start doing coefficients or powers
+        inclusion_patterns = [x.strip() for x in re.split('[\+\*\\-]', expression)]
+        transformer_settings['inclusion_patterns'] = inclusion_patterns
+        model_config = self.update_model_config(transformer_id, transformer_settings, model_config)
+        super(linear_combination, self).__init__(transformer_id, model_config, project_settings)
+        equals = transformer_settings['equals']
+        if transformer_settings.has_key('keep_cols'):
+            keep_cols = transformer_settings['keep_cols']
+        else:
+            keep_cols = True
+        self.keep_cols = keep_cols
+        self.equals = equals
+        self.expression = expression
+        self.set_base_transformer(None)
+
+    def update_model_config(self, transformer_id, new_config, model_config):
+        manipulations = model_config['feature_settings']['manipulations']
+        manipulator_map = dict(zip(range(len(manipulations)),[x.keys()[0] for x in manipulations]))
+        inv_man_map = flip_dict(manipulator_map)
+        t_idx = inv_man_map[transformer_id]
+        model_config['feature_settings']['manipulations'][t_idx][transformer_id] = new_config
+        return model_config
+
+    def fit(self, X_mat, y, **kwargs):
+        inclusion_patterns = self.inclusion_patterns
+        touch_indices = self.touch_indices
+        assert len(inclusion_patterns) == len(touch_indices)
+        expression = self.expression
+        operator_regex = re.compile(r"[\+\*\\-]")
+        operators = operator_regex.findall(expression)
+        assert len(operators) == len(inclusion_patterns) - 1
+        expression_str = 'X_touch.loc[:, ' + str(touch_indices[0]) + ']'
+        for i in range(len(operators)):
+            rel_col = touch_indices[i+1]
+            rel_opr = operators[i]
+            expression_str = expression_str + ' ' + rel_opr + ' ' + 'X_touch.loc[:, ' +\
+                             str(rel_col) + ']'
+        keep_cols = self.keep_cols
+        self.set_base_transformer(ExpressionEvaluator(expression_str,keep_cols))
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        keep_cols = self.keep_cols
+        equals = self.equals
+        if not keep_cols:
+            new_features =  [equals]
+        else:
+            new_features = [prior_features[i] for i in touch_indices] + [equals]
+        return new_features
 
 class interaction_terms(TransformChain):
     """
