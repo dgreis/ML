@@ -16,6 +16,7 @@ from algorithms.algoutils import get_algo_class
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.decomposition import PCA
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
@@ -68,7 +69,11 @@ class TransformChain(ManipulatorChain):
                             X_dev, y_dev = le.remove_leaking_indices(X_mat, y)
                     else:
                         X_dev, y_dev = X_mat, y
-                    transformer.configure_features()
+                    cf_args = self._get_args(transformer_class, 'configure_features')
+                    cf_kwargs = dict()
+                    for arg in cf_args:
+                        cf_kwargs[arg] = eval(arg)
+                    transformer.configure_features(**cf_kwargs)
                     touch_cols = transformer.touch_indices
                     X_rel = X_dev.loc[:,touch_cols]
                     transformer.fit(X_rel, y_dev)
@@ -548,8 +553,6 @@ class ind_interaction_terms(basis_expansion):
         assert X_touched.shape[1] == len(pairwise_ints) * 3
         return X_touched, y_touch
 
-
-
     def gen_new_column_names(self, touch_indices, prior_features):
         expanded_interactions = self.expanded_interactions
         new_features = list()
@@ -982,6 +985,74 @@ class ind_as_numeric(Transformer):
 
     def transform(self, X_touch, y_touch, dataset_name):
         return self.base_transformer.transform(X_touch,dataset_name), y_touch
+
+class encode(TransformChain):
+    """
+    This transformation converts numeric variables to categorical ones
+    TODO: Handle missing data, i.e. convert missing data into category. That would involve including this in pre-processing/data cleaning
+
+    sample yaml usage:
+    ...
+    manipulations:
+        - encode:
+          inclusion_patterns:
+            - 'YrSold'
+    """
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        encode_entry = self.fetch_transform_chain_settings(model_config)
+        inclusion_patterns = encode_entry['inclusion_patterns']
+        i = 0
+        expanded_transformations = list()
+        for pattern in inclusion_patterns:
+            transformation_dict = dict()
+            transformation_dict[str(i) + '.' + 'ind_encode'] = {
+                'inclusion_patterns': [pattern],
+            }
+            expanded_transformations.append(transformation_dict)
+            i += 1
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(encode, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
+
+class ind_encode(Transformer):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_encode, self).__init__(transformer_id, model_config, project_settings)
+        self.creates_numeric_column = False
+        self.set_base_transformer(OneHotEncoder(sparse=False))
+
+    def fit(self, X_mat, y, **kwargs):
+        #TODO: if this becomes some kind of pre-processing transformer, I think here I'll need
+        #to save the val -> int index map here
+        pass
+
+    def transform(self, X_touch, y_touch, **kwargs):
+        touch_indices = self.touch_indices
+        assert len(touch_indices) == 1
+        touch_idx = touch_indices[0]
+        input_array = np.array(list(X_touch.loc[:, touch_idx])).reshape(-1, 1)
+        enc = self.base_transformer
+        X_touched = pd.DataFrame(enc.fit_transform(input_array),index=X_touch.index)
+        return X_touched, y_touch
+
+    def configure_features(self, X_dev):
+        prior_features = self.load_prior_features()
+        touch_indices, untouched_indices = self.return_touch_untouched_indices(prior_features)
+        try:
+            assert len(touch_indices) > 0 #This check might be redundant with the one in the Transformer.fit() method
+        except AssertionError:
+            print "Warning: " + self.manipulator_name + " is about touch 0 relevant columns."
+        self.touch_indices = touch_indices
+        self.untouched_indices = untouched_indices
+        assert len(touch_indices) == 1
+        touch_idx = touch_indices[0]
+        cat_vals = X_dev.loc[:,touch_idx].value_counts().index.values.tolist()
+        base_col = prior_features[touch_idx]
+        new_features = sorted([base_col + '_' + str(x) for x in cat_vals])
+        new_feature_set = self.reindex(prior_features, new_features)
+        self.update_inclusion_patterns(prior_features)
+        self.features = new_feature_set
+        self.output_features()
 
 class sample(HorizontalTransformer):
     """Example in models.yaml file:
