@@ -264,6 +264,11 @@ class HorizontalTransformer(Transformer):
         else:
             return X_untouched, y_untouched
 
+    def update_touch_indices(self,X_mat):
+        touch_indices = self.touch_indices
+        untouched_indices = filter(lambda x: x not in touch_indices, X_mat.index.tolist())
+        self.untouched_indices = untouched_indices
+
 class Cleaner(Transformer):
 
     #TODO: Figure out multiple inheritance here to set validation_peeking attribute once for all Cleaners

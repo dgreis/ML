@@ -4,7 +4,7 @@ import time
 
 import pandas as pd
 
-from feature.engineering import Cleaner
+from feature.engineering import Cleaner, HorizontalTransformer
 from feature.manipulator import ManipulatorChain, Manipulator
 
 
@@ -76,6 +76,10 @@ class TransformChain(ManipulatorChain):
                     touch_cols = transformer.touch_indices
                     X_rel = X_dev.loc[:,touch_cols]
                     transformer.fit(X_rel, y_dev)
+                    if leak_exists and not leak_allowed:
+                        if issubclass(transformer.__class__, HorizontalTransformer):
+                            X_rel, y_dev = X_mat, y
+                            transformer.update_touch_indices(X_mat)
                 split_args = self._get_args(transformer_class, 'split')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], split_args)
                 spkwargs = dict()
