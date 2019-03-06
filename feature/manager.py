@@ -7,7 +7,8 @@ import numpy as np
 
 from collections import OrderedDict
 
-from feature.engineering import TransformChain, Cleaner, delete_obs
+from feature.engineering import Cleaner, delete_obs
+from feature.transformchain import TransformChain
 from feature.selection import FilterChain
 from utils import find_data_dir, load_clean_input_file_filepath, load_inv_column_map, flip_dict
 
@@ -19,6 +20,8 @@ class Manager:
 
         selection_module = importlib.import_module('feature.selection')
         engineering_module = importlib.import_module('feature.engineering')
+        transformchain_module = importlib.import_module('feature.transformchain')
+        tagger_module = importlib.import_module('feature.tagger')
         manipulator_map = dict()
         chain_plan = list()
         i = 0
@@ -26,6 +29,10 @@ class Manager:
             manipulator_id = m.keys()[0]
             manipulator_class_name = manipulator_id.split('.')[-1:][0]
             if hasattr(engineering_module, manipulator_class_name):
+                manipulator_type = 'transformer'
+            elif hasattr(transformchain_module, manipulator_class_name):
+                manipulator_type = 'transformer'
+            elif hasattr(tagger_module, manipulator_class_name):
                 manipulator_type = 'transformer'
             elif hasattr(selection_module, manipulator_class_name):
                 manipulator_type = 'filter'

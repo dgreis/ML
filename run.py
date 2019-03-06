@@ -6,6 +6,7 @@ import copy
 from utils import *
 from evaluation import *
 from cross_validation import *
+from feature.manager import Manager
 from report import Report
 from algorithms.algoutils import configure_algorithm
 

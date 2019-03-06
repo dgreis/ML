@@ -1,10 +1,10 @@
 import inspect
 import pandas as pd
 import os
+import importlib
 
 from django.utils.text import slugify
 from utils import find_project_dir, flip_dict, load_clean_input_file_filepath, load_inv_column_map
-
 
 class Manipulator(object):
 
@@ -42,14 +42,28 @@ class Manipulator(object):
         manipulator_map = self.manipulator_map
         manipulator_name = self.manipulator_name
         m_order = manipulator_map[manipulator_name]
-        if m_order == 0:
-            prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
-        else:
-            ord_manip_lookup = flip_dict(manipulator_map)
-            prior_manipulator_name = ord_manip_lookup[m_order - 1]
-            prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_manipulator_name)
+        tagger_module = importlib.import_module('feature.tagger')
+        counter = m_order
+        ord_man_map = flip_dict(manipulator_map)
+        while counter > 0:
+            cand_man_name = ord_man_map[counter - 1]
+            init_man = filter(lambda x: x.keys()[0] == cand_man_name, manipulations)[0][cand_man_name]['initialized_manipulator']
+            if issubclass(init_man.__class__, getattr(tagger_module, 'Tagger')):
+                counter = counter - 1
+            else:
+                prior_man_name = cand_man_name
+                prior_manipulator_feature_names_filepath = self._det_output_features_filepath(prior_man_name)
+                return prior_manipulator_feature_names_filepath
+        prior_manipulator_feature_names_filepath = load_clean_input_file_filepath(project_settings, 'feature_names')
         return prior_manipulator_feature_names_filepath
 
+    def fetch_manipulator_settings(self, model_config):
+        manipulator_map = self.manipulator_map
+        manipulator_name = self.manipulator_name
+        t_idx = manipulator_map[manipulator_name]
+        manipulations = model_config['feature_settings']['manipulations']
+        manipulator_settings = manipulations[t_idx][manipulator_name]
+        return manipulator_settings
 
     def output_features(self):
         manipulator_name = self.manipulator_name
