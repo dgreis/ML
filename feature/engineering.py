@@ -478,9 +478,6 @@ class normalize(Transformer):
               - normalize:
                   inclusion_patterns:
                     - <pattern>
-     (You can also specify 'All Numeric' to normalize all numeric columns, provided
-     that you include a list of the numeric feature names in the project_settings yaml
-     file in the src folder of the project directory) with the key 'numeric_features'
     """
     def __init__(self, transformer_id, model_config, project_settings):
         super(normalize, self).__init__(transformer_id, model_config, project_settings)
@@ -505,9 +502,6 @@ class standard_scale(Transformer):
               - standard_scale:
                   inclusion_patterns:
                     - <pattern>
-     (You can also specify 'All Numeric' to scale all numeric columns, provided
-     that you include a list of the numeric feature names in the project_settings yaml
-     file in the src folder of the project directory) with the key 'numeric_features'
     """
     def __init__(self, transformer_id, model_config, project_settings):
         super(standard_scale, self).__init__(transformer_id, model_config, project_settings)

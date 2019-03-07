@@ -156,10 +156,6 @@ class CrossValidator:
                 content = metric_class(y_pred, y_val_p, **kwargs)
                 report_row['content'] = content
                 report_entries = report_entries.append(report_row,ignore_index=True)
-            #commented line below b/c a new manager instance cleans data again and messes up prior_feature references
-            #manager = Manager(model_config, project_settings)
-            if model_config.has_key('numeric_features'):
-                model_config['numeric_features'] = copy.copy(project_settings['numeric_features'])
             f += 1
         return report_entries
 

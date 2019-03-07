@@ -115,3 +115,21 @@ def det_num_cv_folds(model_config, project_settings):
             return model_config['cv_num_folds']
     else:
         return project_settings['assessment']['cv_num_folds']
+
+def finalize_manipulations(model_config, project_settings):
+    if model_config['feature_settings'].has_key('preprocess_config'):
+        preprocess_config_name = model_config['feature_settings']['preprocess_config']
+        try:
+            assert project_settings.has_key('preprocess_configs') and project_settings['preprocess_configs'].has_key(
+                preprocess_config_name)
+        except AssertionError:
+            print("Preprocess configs not correctly specified")
+            raise Exception
+        preprocess_manipulations = [
+            {'handle_missing_data': project_settings['preprocess_configs'][preprocess_config_name]}]
+    else:
+        preprocess_manipulations = list()
+
+    manipulations = preprocess_manipulations + model_config['feature_settings']['manipulations']
+    model_config['feature_settings']['manipulations'] = manipulations
+    return model_config
