@@ -142,7 +142,6 @@ class Manager:
         return data
 
     def handle_missing_data(self, X, y):
-        #TODO: Don't forget that you probably broke Horizontal Transformer combine.
         model_config = self.model_config
         project_settings = self.project_settings
         manipulations = model_config['feature_settings']['manipulations']

@@ -1067,6 +1067,8 @@ class delete_obs(HorizontalTransformer, Cleaner):
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
         assert len(touch_indices) != len(X)
+        #if you run afoul of assertion above, it's probably because you have data missing
+        #in every row.
 
 class ind_delete_var(Cleaner, Transformer):
 
