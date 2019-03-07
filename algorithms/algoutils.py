@@ -11,7 +11,8 @@ def configure_algorithm(model_config, project_settings):
         base_algo_instance = base_algo_class('final_algorithm', model_config, project_settings)
     return base_algo_instance
 
-def get_algo_class(base_algorithm):
+def get_algo_class(base_algorithm_name):
+    base_algorithm = max(base_algorithm_name.split('__'), key=len)
     module_comps = base_algorithm.split('.')
     module_name = ('.').join(module_comps[:-1])
     module = importlib.import_module(module_name)
