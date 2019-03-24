@@ -5,9 +5,7 @@ model_facet_defaults:
     keyword_arg_settings : {}
     other_options: {}
     feature_settings:
-        feature_engineering: []
-        select_before_eng: False
-        feature_selection: []
+        manipulations: []
     hyperparam_tuning_settings: None
     evaluate_testset: False
 
