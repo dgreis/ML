@@ -3,6 +3,7 @@ ml_problem_type: 'regression'
 data_dir : "data/"
 parse_engine: "python"
 train_test_split: 0.75
+target_variable: "SalePrice"
 raw_input_files:
   train: "train.csv"
   test: "test.csv"
@@ -16,9 +17,83 @@ clean_input_files:
   X_test: "processed/X_test.txt"
   y_test : "processed/y_test.txt"
   feature_names: "processed/features.txt"
-numeric_features: [ '3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
-                  'LotArea', 'YearRemodAdd', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
-                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
-                  'TotalBsmtSF', 'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
-                  'YrSold', 'YearBuilt', 'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
-                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+#numeric_features: [ '3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+#                  'LotArea', 'YearRemodAdd', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+#                  'TotalBsmtSF', 'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+#                  'YrSold', 'YearBuilt', 'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+preprocess_configs:
+  Test:
+        - recode:
+            replace_with:
+              PoolQC_NA: 'None'
+              MiscFeature_NA: 'None'
+              Alley_NA: 'None'
+              Fence_NA: 'None'
+              FireplaceQu_NA: 'None'
+              GarageType_NA: 'None'
+              GarageFinish_NA: 'None'
+              GarageCond_NA: 'None'
+              GarageQual_NA: "None"
+              BsmtQual_NA: 'None'
+              BsmtCond_NA: 'None'
+              BsmtExposure_NA: 'None'
+              BsmtFinType1_NA: 'None'
+              BsmtFinType2_NA: 'None'
+              MasVnrType_NA: 'None'
+              MSZoning_NA: "RL"
+              Functional_NA: "Typ"
+              Electrical_NA: 'SBrkr'
+              KitchenQual: "<Mode>"
+              Exterior1st: "<Mode>"
+              Exterior2nd: "<Mode>"
+              SaleType_NA: "WD"
+              MSSubClass_NA: "None"
+        - impute_vars:
+            inclusion_patterns:
+              - "LotFrontage"
+            replace_with: 'median'
+        - impute_vars:
+            inclusion_patterns:
+              - "GarageYrBlt"
+              - "GarageArea"
+              - "GarageCars"
+              - "BsmtFinSF1"
+              - "BsmtFinSF2"
+              - "MasVnrArea"
+              - "BsmtUnfSF"
+              - "TotalBsmtSF"
+              - "BsmtFullBath"
+              - "BsmtHalfBath"
+              - "MasVnrArea"
+            replace_with: 'zeros'
+        - delete_vars:
+            inclusion_patterns:
+              - "Utilities"
+        - as_numeric:
+            val_maps:
+              - FireplaceQu: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - BsmtQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - BsmtCond: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - GarageQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - GarageCond: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - ExterQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - ExterCond: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - HeatingQC: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - PoolQC: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - KitchenQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+              - BsmtFinType1: {'GLQ': 6,'ALQ': 5,'BLQ': 4,'Rec': 3,'LwQ': 2,'Unf': 1,'None': 0}
+              - BsmtFinType2: {'GLQ': 6,'ALQ': 5,'BLQ': 4,'Rec': 3,'LwQ': 2,'Unf': 1,'None': 0}
+              - Functional: {'Typ':7,'Min1':6,'Min2':5,'Mod':4,'Maj1':3,'Maj2':2,'Sev':1,'NA':0}
+              - Fence: {'GdPrv':4,'MnPrv':3,'GdWo':2,'MnWw':1,'None':0}
+              - BsmtExposure: {'Gd':4,'Av':3,'Mn':2,'No':1,'None': 0}
+              - GarageFinish:  {'Fin':3,'RFn':2,'Unf':1,'None':0}
+              - LandSlope: {'Gtl':3, 'Mod':2, 'Sev':1}
+              - LotShape: {'Reg':0,'IR1':1,'IR2':2,'IR3':3}
+              - PavedDrive: {'Y':3,'P':2,'N':1}
+              - Street: {'Grvl':0, 'Pave':1}
+              - Alley: {'Grvl':2,'Pave':1,'None':0}
+              - CentralAir: {'Y':1,'N':0}
+              - MSSubClass: {'20':0,'30':1,'40':2,'45':3,'50':4,'60':5,'70':6,'75':7,'80':8,
+                             '85':9,'90':10,'120':11,'160':12,'180':13,'190':14, 'None':0}

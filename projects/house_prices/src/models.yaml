@@ -1,289 +1,522 @@
 Models:
-#
-#  Base LR:
-#    base_algorithm: sklearn.linear_model.LinearRegression
-##
-#  Base LR with as_numeric:
-#    base_algorithm: sklearn.linear_model.LinearRegression
+
+#  Base GBR:
+#    base_algorithm: sklearn.ensemble.GradientBoostingRegressor
 #    feature_settings:
-#      feature_engineering:
-#          - include_features:
-#              inclusion_patterns:
-#              - 'id'
-#              - 'GrLivArea'
-#              - 'TotalBsmtSF'
-#              - 'OpenPorchSF'
-#              - 'BsmtFinSF1'
-#          - drop_outliers:
-#              inclusion_patterns:
-#                - 'BsmtFinSF1'
-#                - 'GrLivArea'
-#
-#
-#  Stacked LR with RF and GBR predict:
-#    base_algorithm: sklearn.linear_model.LinearRegression
+#      manipulations:
+#      - handle_missing_data:
+#          - recode:
+#              replace_with:
+#                  BasmtFinType1_NA: 'Test'
+#                  Fence_NA: 'None'
+#                  GarageType_NA: 'Test'
+#                  MiscFeature_NA: 'None'
+#                  GarageFinish_NA: 'Test'
+#                  BsmtFinType2_NA: 'Test'
+#                  BsmtQual_NA: 'Test'
+#                  GarageCond_NA: 'Test'
+#                  BsmtCond_NA: 'Test'
+#                  FireplaceQu_NA: 'None'
+#                  BsmtExposure_NA: 'Test'
+#                  MasVnrType_NA: 'Test'
+#                  Alley_NA: 'None'
+#                  PoolQC_NA: 'None'
+#                  Electrical_NA: 'Test'
+#          - impute_vars:
+#                inclusion_patterns:
+#                  - "LotFrontage"
+#                  - "MasVnrArea"
+#                  - "GarageYrBlt"
+#                replace_with: 'zeros'
+#          - delete_obs:
+#              inclusion_patterns: 'All'
+
+
+#  Base Stacking:
+#    base_algorithm: algorithms.common.MetaModeler
+#    #evaluate_testset: True
 #    feature_settings:
-#      feature_engineering:
-#        - standard_scale:
-#            inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
-#                'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
-#                'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
-#                'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
-#                 'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
-#                'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
-#        - RF.predict:
-#            inclusion_patterns:
-#              - "All"
-#            base_algorithm: sklearn.ensemble.RandomForestRegressor
-#            keyword_arg_settings:
-#              random_state: 1234
-#        - reset_data:
-#            inclusion_patterns:
-#              All But:
-#                - 'RF.predict_hat'
-#        - GBR.predict:
-#            inclusion_patterns:
-#              All But:
-#                - "RF.predict_hat"
-#            base_algorithm: sklearn.ensemble.GradientBoostingRegressor
-#            keyword_arg_settings:
-#              random_state: 1234
-#        - include_features:
-#            inclusion_patterns: ["RF.predict_hat","GBR.predict_hat"]
-#
-#  Linear Regression f_based FS K=40:
+#      manipulations:
+#      - handle_missing_data:
+#          - recode:
+#              replace_with:
+#                  BasmtFinType1_NA: 'Test'
+#                  Fence_NA: 'Test'
+#                  GarageType_NA: 'Test'
+#                  MiscFeature_NA: 'Test'
+#                  GarageFinish_NA: 'Test'
+#                  BsmtFinType2_NA: 'Test'
+#                  BsmtQual_NA: 'Test'
+#                  GarageCond_NA: 'Test'
+#                  BsmtCond_NA: 'Test'
+#                  FireplaceQu_NA: 'Test'
+#                  BsmtExposure_NA: 'Test'
+#                  MasVnrType_NA: 'Test'
+#                  Alley_NA: 'Test'
+#                  PoolQC_NA: 'Test'
+#                  Electrical_NA: 'Test'
+#          - impute_vars:
+#                inclusion_patterns:
+#                  - "LotFrontage"
+#                  - "MasVnrArea"
+#                  - "GarageYrBlt"
+#                replace_with: 'zeros'
+#      - kaggle_stack:
+#          inclusion_patterns:
+#            - 'All'
+#          validation_peeking: False
+#          algorithms:
+#            - sklearn.ensemble.RandomForestRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+#            - sklearn.ensemble.GradientBoostingRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+
+#  Base Stacking DO:
 #    base_algorithm: sklearn.linear_model.LinearRegression
+#    #evaluate_testset: True
 #    feature_settings:
-#      feature_selection:
-#        - f_based:
-#            keyword_arg_settings: {}
-#            other_options:
-#              k: 40
-#
-#  Linear Regression f_based FS K=45:
-#    base_algorithm: sklearn.linear_model.LinearRegression
-#    feature_settings:
-#      feature_selection:
-#        - f_based:
-#            keyword_arg_settings: {}
-#            other_options:
-#              k: 45
-#
-  Linear Regression tree-based FS:
+#      manipulations:
+#      - handle_missing_data:
+#          - recode:
+#              replace_with:
+#                  BasmtFinType1_NA: 'Test'
+#                  Fence_NA: 'None'
+#                  GarageType_NA: 'Test'
+#                  MiscFeature_NA: 'None'
+#                  GarageFinish_NA: 'Test'
+#                  BsmtFinType2_NA: 'Test'
+#                  BsmtQual_NA: 'Test'
+#                  GarageCond_NA: 'Test'
+#                  BsmtCond_NA: 'Test'
+#                  FireplaceQu_NA: 'None'
+#                  BsmtExposure_NA: 'Test'
+#                  MasVnrType_NA: 'Test'
+#                  Alley_NA: 'None'
+#                  PoolQC_NA: 'None'
+#                  Electrical_NA: 'Test'
+#          - impute_vars:
+#                inclusion_patterns:
+#                  - "LotFrontage"
+#                  - "MasVnrArea"
+#                  - "GarageYrBlt"
+#                replace_with: 'zeros'
+#          - delete_obs:
+#              inclusion_patterns: 'All'
+#      - livarea.truncate:
+#          inclusion_patterns:
+#            - GrLivArea : [0,4000]
+#            - SalePrice : [0,300000]
+#      - kaggle_stack:
+#          inclusion_patterns:
+#            - 'All'
+#          validation_peeking: False
+#          algorithms:
+#            - sklearn.ensemble.RandomForestRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+#            - sklearn.ensemble.GradientBoostingRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+
+  No Peeking:
     base_algorithm: sklearn.linear_model.LinearRegression
+    evaluate_testset: False
     feature_settings:
-      feature_selection:
-        - tree_based:
-              keyword_arg_settings: {random_state: 1234}
-              other_options: {}
+      preprocess_config: "Test"
+      manipulations:
+      - encode:
+          inclusion_patterns:
+            - 'YrSold'
+      - livarea.truncate:
+          inclusion_patterns:
+            - GrLivArea : [0,4000]
+            - SalePrice : [0,300000]
+      - linear_combination:
+          expression: 'TotalBsmtSF + 1stFlrSF + 2ndFlrSF'
+          equals: 'NewTestCol'
+          keep_cols: True
+      - box_cox_transform:
+          inclusion_patterns: 'All Skewed'
+          skew_threshold: 0.75
+      - kaggle_stack:
+          inclusion_patterns:
+            - 'All'
+          validation_peeking: False
+          algorithms:
+            - 0__algorithms.common.Pipeline:
+                keyword_arg_settings:
+                  algorithms:
+                    - sklearn.preprocessing.RobustScaler:
+                        keyword_arg_settings: {}
+                    - sklearn.linear_model.Lasso:
+                        keyword_arg_settings:
+                          alpha : 0.0005
+                        random_state: 1
+            - 1__algorithms.common.Pipeline:
+                keyword_arg_settings:
+                  algorithms:
+                    - sklearn.preprocessing.RobustScaler:
+                        keyword_arg_settings: {}
+                    - sklearn.linear_model.ElasticNet:
+                        keyword_arg_settings:
+                          alpha: 0.0005
+                          l1_ratio: 0.9
+                          random_state : 3
+            - sklearn.kernel_ridge.KernelRidge:
+                keyword_arg_settings:
+                  alpha: 0.6
+                  kernel: 'polynomial'
+                  degree : 2
+                  coef0: 2.5
+            - sklearn.ensemble.GradientBoostingRegressor:
+                keyword_arg_settings:
+                  n_estimators: 3000
+                  learning_rate: 0.05
+                  max_depth: 4
+                  max_features: 'sqrt'
+                  min_samples_leaf: 15
+                  min_samples_split: 10
+                  loss: 'huber'
+                  random_state: 5
+            - xgboost.XGBRegressor:
+                keyword_arg_settings:
+                  colsample_bytree: 0.4603
+                  gamma: 0.0468
+                  learning_rate: 0.05
+                  max_depth: 3
+                  min_child_weight: 1.7817
+                  n_estimators: 2200
+                  reg_alpha: 0.4640
+                  reg_lambda: 0.8571
+                  subsample: 0.5213
+                  silent: 1
+                  random_state: 7
+                  nthread:  -1
+#            - lightgbm.LGBMRegressor:
+#                keyword_arg_settings:
+#                  objective: 'regression'
+#                  num_leaves: 5
+#                  learning_rate: 0.05
+#                  n_estimators: 720
+#                  max_bin: 55
+#                  bagging_fraction: 0.8
+#                  bagging_freq: 5
+#                  feature_fraction: 0.2319
+#                  feature_fraction_seed: 9
+#                  bagging_seed: 9
+#                  min_data_in_leaf: 6
+#                  min_sum_hessian_in_leaf: 11
+#
+#  Base Stacking With Peeking:
+#    base_algorithm: sklearn.linear_model.LinearRegression
+#    evaluate_testset: False
+#    feature_settings:
+#      manipulations:
+#      - handle_missing_data:
+#          - recode:
+#              replace_with:
+#                PoolQC_NA: 'None'
+#                MiscFeature_NA: 'None'
+#                Alley_NA: 'None'
+#                Fence_NA: 'None'
+#                FireplaceQu_NA: 'None'
+#                GarageType_NA: 'None'
+#                GarageFinish_NA: 'None'
+#                GarageCond_NA: 'None'
+#                GarageQual_NA: "None"
+#                BsmtQual_NA: 'None'
+#                BsmtCond_NA: 'None'
+#                BsmtExposure_NA: 'None'
+#                BsmtFinType1_NA: 'None'
+#                BsmtFinType2_NA: 'None'
+#                MasVnrType_NA: 'None'
+#                MSZoning_NA: "RL"
+#                Functional_NA: "Typ"
+#                Electrical_NA: 'SBrkr'
+#                KitchenQual: "<Mode>"
+#                Exterior1st: "<Mode>"
+#                Exterior2nd: "<Mode>"
+#                SaleType_NA: "WD"
+#                MSSubClass_NA: "None"
+#          - impute_vars:
+#                inclusion_patterns:
+#                  - "LotFrontage"
+#                replace_with: 'median'
+#          - impute_vars:
+#                inclusion_patterns:
+#                  - "GarageYrBlt"
+#                  - "GarageArea"
+#                  - "GarageCars"
+#                  - "BsmtFinSF1"
+#                  - "BsmtFinSF2"
+#                  - "MasVnrArea"
+#                  - "BsmtUnfSF"
+#                  - "TotalBsmtSF"
+#                  - "BsmtFullBath"
+#                  - "BsmtHalfBath"
+#                  - "MasVnrArea"
+#                replace_with: 'zeros'
+#          - delete_vars:
+#              inclusion_patterns:
+#                - "Utilities"
+#      - as_numeric:
+#          val_maps:
+#            - FireplaceQu: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - BsmtQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - BsmtCond: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - GarageQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - GarageCond: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - ExterQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - ExterCond: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - HeatingQC: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - PoolQC: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - KitchenQual: {'Ex': 5,'Gd': 4,'TA': 3,'Fa': 2,'Po': 1,'None': 0}
+#            - BsmtFinType1: {'GLQ': 6,'ALQ': 5,'BLQ': 4,'Rec': 3,'LwQ': 2,'Unf': 1,'None': 0}
+#            - BsmtFinType2: {'GLQ': 6,'ALQ': 5,'BLQ': 4,'Rec': 3,'LwQ': 2,'Unf': 1,'None': 0}
+#            - Functional: {'Typ':7,'Min1':6,'Min2':5,'Mod':4,'Maj1':3,'Maj2':2,'Sev':1,'NA':0}
+#            - Fence: {'GdPrv':4,'MnPrv':3,'GdWo':2,'MnWw':1,'None':0}
+#            - BsmtExposure: {'Gd':4,'Av':3,'Mn':2,'No':1,'None': 0}
+#            - GarageFinish:  {'Fin':3,'RFn':2,'Unf':1,'None':0}
+#            - LandSlope: {'Gtl':3, 'Mod':2, 'Sev':1}
+#            - LotShape: {'Reg':0,'IR1':1,'IR2':2,'IR3':3}
+#            - PavedDrive: {'Y':3,'P':2,'N':1}
+#            - Street: {'Grvl':0, 'Pave':1}
+#            - Alley: {'Grvl':2,'Pave':1,'None':0}
+#            - CentralAir: {'Y':1,'N':0}
+#            - MSSubClass: {'20':0,'30':1,'40':2,'45':3,'50':4,'60':5,'70':6,'75':7,'80':8,
+#                            '85':9,'90':10,'120':11,'160':12,'180':13,'190':14, 'None':0}
+#      - encode:
+#          inclusion_patterns:
+#            - 'YrSold'
+#      - livarea.truncate:
+#          inclusion_patterns:
+#            - GrLivArea : [0,4000]
+#            - SalePrice : [0,300000]
+#      - linear_combination:
+#          expression: 'TotalBsmtSF + 1stFlrSF + 2ndFlrSF'
+#          equals: 'NewTestCol'
+#          keep_cols: True
+#      - box_cox_transform:
+#          inclusion_patterns: 'All Skewed'
+#          skew_threshold: 0.75
+#      - kaggle_stack:
+#          inclusion_patterns:
+#            - 'All'
+#          validation_peeking: False
+#          algorithms:
+#            - sklearn.ensemble.RandomForestRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+#            - sklearn.ensemble.GradientBoostingRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+
+#  Stacking Plus Peeking:
+#    base_algorithm: algorithms.common.MetaModeler
+#    #evaluate_testset: True
+#    feature_settings:
+#      manipulations:
+#      - handle_missing_data:
+#          - recode:
+#              replace_with:
+#                  BasmtFinType1_NA: 'Test'
+#                  Fence_NA: 'Test'
+#                  GarageType_NA: 'Test'
+#                  MiscFeature_NA: 'Test'
+#                  GarageFinish_NA: 'Test'
+#                  BsmtFinType2_NA: 'Test'
+#                  BsmtQual_NA: 'Test'
+#                  GarageCond_NA: 'Test'
+#                  BsmtCond_NA: 'Test'
+#                  FireplaceQu_NA: 'Test'
+#                  BsmtExposure_NA: 'Test'
+#                  MasVnrType_NA: 'Test'
+#                  Alley_NA: 'Test'
+#                  PoolQC_NA: 'Test'
+#                  Electrical_NA: 'Test'
+#          - impute_vars:
+#                inclusion_patterns:
+#                  - "LotFrontage"
+#                  - "MasVnrArea"
+#                  - "GarageYrBlt"
+#                replace_with: 'zeros'
+#      - kaggle_stack:
+#          inclusion_patterns:
+#            - 'All'
+#          validation_peeking: True
+#          algorithms:
+#            - sklearn.ensemble.RandomForestRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+#            - sklearn.ensemble.GradientBoostingRegressor:
+#                keyword_arg_settings:
+#                  random_state: 1234
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #
-##  Random Forest Base:
-##    base_algorithm: sklearn.ensemble.RandomForestRegressor
-##
-##  Neural Network Base:
-##    base_algorithm: sklearn.neural_network.MLPRegressor
-##
-#  RandomForest Base Scaled:
-#    base_algorithm: algorithms.regression.RandomForestRegressor
-#    keyword_arg_settings:
-#      random_state: 1234
-#    other_options:
-#      gen_output: True
-#    feature_settings:
-#      feature_engineering:
-#        - standard_scale:
-#            inclusion_patterns:
-#              - "All"
+#  Kaggle_Stack_Test:
+#      base_algorithm: algorithms.common.MetaModeler
+#      feature_settings:
+#        manipulations:
+#          - handle_missing_data:
+#            - impute_vars:
+#                inclusion_patterns:
+#                    - 'SaleCondition_Partial'
+#                    - 'SaleCondition_Family'
+#                strategy:
+#                    replace_with: 'zeros'
+##            - delete_obs:
+##                inclusion_patterns: "All"
+#          - kaggle_stack:
+#              inclusion_patterns:
+#                - 'All'
+#              validation_peeking: False
+#              algorithms:
+#                - sklearn.ensemble.RandomForestRegressor:
+#                    keyword_arg_settings:
+#                      random_state: 1234
+#                - sklearn.ensemble.GradientBoostingRegressor:
+#                    keyword_arg_settings:
+#                      random_state: 1234
 #
-##  SVM Base:
-##    base_algorithm: sklearn.svm.SVR
+
+
 ##
-#  RandomForest Base Scaled remove id:
-#    base_algorithm: algorithms.regression.RandomForestRegressor
-#    keyword_arg_settings:
-#      random_state: 1234
-#    feature_settings:
-#      select_before_eng: True
-#      feature_engineering:
-#        - exclude_features:
-#            inclusion_patterns:
-#              - 'id'
-#        - standard_scale:
-#            inclusion_patterns:
-#              - "All"
-#
-#  RandomForest Base Scaled remove id and lincombos:
-#    base_algorithm: algorithms.regression.RandomForestRegressor
-#    keyword_arg_settings:
-#      random_state: 1234
-#    feature_settings:
-#      feature_engineering:
-#        - exclude_features:
-#            inclusion_patterns:
-#              - 'id'
-#              - 'GrLivArea'
-#              - 'TotalBsmtSF'
-#        - standard_scale:
-#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
-#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
-#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
-#                   'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
-#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
-#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
-#
-##  Base GBR:
-##    base_algorithm: sklearn.ensemble.GradientBoostingRegressor
+##  RandomForest Base Scaled remove id and lincombos:
+##    base_algorithm: algorithms.regression.RandomForestRegressor
 ##    keyword_arg_settings:
 ##      random_state: 1234
+##    feature_settings:
+##      feature_engineering:
+##        - exclude_features:
+##            inclusion_patterns:
+##              - 'id'
+##              - 'GrLivArea'
+##              - 'TotalBsmtSF'
+##        - standard_scale:
+##              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+##                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+##                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+##                   'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+##                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+##                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
 ##
-#
-#  GBR Inter:
-#    base_algorithm: sklearn.ensemble.GradientBoostingRegressor
-#    keyword_arg_settings:
-#      random_state: 1234
-#    feature_settings:
-#      feature_engineering:
-#        - exclude_features:
-#            inclusion_patterns:
-#              - 'id'
-#              - 'GrLivArea'
-#              - 'TotalBsmtSF'
-#        - standard_scale:
-#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
-#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
-#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
-#                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
-#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
-#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
-#        - interaction_terms:
-#            interactions:
-#              - "('YearRemodAdd','YearBuilt')"
-#              - "('WoodDeckSF','PoolArea')"
-#              - "('BsmtQual','BsmtExposure')"
-#              - "('YearBuilt','ExterQual')"
-#              - "('Functional','KitchenQual')"
-#
-#
-#  RandomForest Base Scaled Interactions:
-#    base_algorithm: algorithms.regression.RandomForestRegressor
-#    keyword_arg_settings:
-#      random_state: 1234
-#    other_options:
-#      gen_output: True
-#    feature_settings:
-#      feature_engineering:
-#        - exclude_features:
-#            inclusion_patterns:
-#              - 'id'
-#              - 'GrLivArea'
-#              - 'TotalBsmtSF'
-#        - standard_scale:
-#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
-#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
-#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
-#                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
-#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
-#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
-#        - interaction_terms:
-#            interactions:
-#              - "('YearRemodAdd','YearBuilt')"
-#              - "('scaled(WoodDeckSF)','scaled(PoolArea)')"
-#              - "('BsmtQual','BsmtExposure')"
-#              - "('YearBuilt','ExterQual')"
-#              - "('Functional','KitchenQual')"
-#        - interpolate:
-#            inclusion_patterns:
-#             - 'scaled(OverallQual)'
-#            kwargs:
-#              lowess: {}
-#              interp1d: {}
-#
-#  RandomForest Base Scaled Interactions and LOO MoSold:
-#    base_algorithm: algorithms.regression.RandomForestRegressor
-#    keyword_arg_settings:
-#      random_state: 1234
+
+
+##
+##
+##  RandomForest Base Scaled Interactions:
+##    base_algorithm: algorithms.regression.RandomForestRegressor
+##    keyword_arg_settings:
+##      random_state: 1234
 ##    other_options:
 ##      gen_output: True
-#    feature_settings:
-#      feature_engineering:
-#        - exclude_features:
-#            inclusion_patterns:
-#              - 'id'
-#              - 'GrLivArea'
-#              - 'TotalBsmtSF'
-#        - standard_scale:
-#              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
-#                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
-#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
-#                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
-#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
-#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
-#        - interaction_terms:
-#            interactions:
-#              - "('YearRemodAdd','YearBuilt')"
-#              - "('scaled(WoodDeckSF)','scaled(PoolArea)')"
-#              - "('BsmtQual','BsmtExposure')"
-#              - "('YearBuilt','ExterQual')"
-#              - "('Functional','KitchenQual')"
-#        - interpolate:
-#            inclusion_patterns:
-#             - 'scaled(OverallQual)'
-#            kwargs:
-#              lowess: {}
-#              interp1d: {}
-#        - loo_encoding:
-#            inclusion_patterns:
-#              - "MoSold"
-#
-#  RandomForest Base Scaled Non Year:
-#    base_algorithm: algorithms.regression.RandomForestRegressor
-#    keyword_arg_settings:
-#      random_state: 1234
-#    feature_settings:
-#      feature_engineering:
-#        - exclude_features:
-#            inclusion_patterns:
-#              - 'id'
-#      feature_engineering:
-#        - standard_scale:
-#            inclusion_patterns: [ '3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
-#                  'LotArea', 'GrLivArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
-#                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
-#                  'TotalBsmtSF', 'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
-#                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
-#                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
-#        - interaction_terms:
-#            interactions:
-#              - "('scaled(OverallQual)','scaled(YearBuilt)')"
-#
-#  LR Base Scaled-PCA:
-#    base_algorithm: sklearn.linear_model.LinearRegression
-#    feature_settings:
-#      feature_engineering:
-#        - standard_scale:
-#            inclusion_patterns:
-#              - "All"
-#        - pca:
-#            inclusion_patterns:
-#             - 'All'
-#            kwargs:
-#              n_components: 2
-#
-#  RandomForest tree-based FS:
-#    base_algorithm: sklearn.ensemble.RandomForestRegressor
-#    feature_settings:
-#      feature_selection:
-#        - f_based:
-#              keyword_arg_settings: {}
-#              other_options:
-#                k: 45
-#
-#  Linear Regression l1_based FS:
-#    base_algorithm: sklearn.linear_model.LinearRegression
-#    feature_settings:
-#      feature_selection:
-#           - l1_based:
-#               method: "LinearSVC"
-#               kwargs:
-#                 dual: False
+##    feature_settings:
+##      feature_engineering:
+##        - exclude_features:
+##            inclusion_patterns:
+##              - 'id'
+##              - 'GrLivArea'
+##              - 'TotalBsmtSF'
+##        - standard_scale:
+##              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+##                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+##                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+##                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+##                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+##                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+##        - interaction_terms:
+##            interactions:
+##              - "('YearRemodAdd','YearBuilt')"
+##              - "('scaled(WoodDeckSF)','scaled(PoolArea)')"
+##              - "('BsmtQual','BsmtExposure')"
+##              - "('YearBuilt','ExterQual')"
+##              - "('Functional','KitchenQual')"
+##        - interpolate:
+##            inclusion_patterns:
+##             - 'scaled(OverallQual)'
+##            kwargs:
+##              lowess: {}
+##              interp1d: {}
+##
+##  RandomForest Base Scaled Interactions and LOO MoSold:
+##    base_algorithm: algorithms.regression.RandomForestRegressor
+##    keyword_arg_settings:
+##      random_state: 1234
+###    other_options:
+###      gen_output: True
+##    feature_settings:
+##      feature_engineering:
+##        - exclude_features:
+##            inclusion_patterns:
+##              - 'id'
+##              - 'GrLivArea'
+##              - 'TotalBsmtSF'
+##        - standard_scale:
+##              inclusion_patterns: ['3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+##                  'LotArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+##                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+##                  'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+##                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+##                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+##        - interaction_terms:
+##            interactions:
+##              - "('YearRemodAdd','YearBuilt')"
+##              - "('scaled(WoodDeckSF)','scaled(PoolArea)')"
+##              - "('BsmtQual','BsmtExposure')"
+##              - "('YearBuilt','ExterQual')"
+##              - "('Functional','KitchenQual')"
+##        - interpolate:
+##            inclusion_patterns:
+##             - 'scaled(OverallQual)'
+##            kwargs:
+##              lowess: {}
+##              interp1d: {}
+##        - loo_encoding:
+##            inclusion_patterns:
+##              - "MoSold"
+##
+##  RandomForest Base Scaled Non Year:
+##    base_algorithm: algorithms.regression.RandomForestRegressor
+##    keyword_arg_settings:
+##      random_state: 1234
+##    feature_settings:
+##      feature_engineering:
+##        - exclude_features:
+##            inclusion_patterns:
+##              - 'id'
+##      feature_engineering:
+##        - standard_scale:
+##            inclusion_patterns: [ '3SsnPorch', 'BsmtFullBath', 'OpenPorchSF', '2ndFlrSF', 'HalfBath', 'OverallCond',
+##                  'LotArea', 'GrLivArea', 'MasVnrArea', '1stFlrSF', 'Fireplaces',
+##                  'EnclosedPorch', 'LotFrontage', 'MiscVal', 'OverallQual', 'BsmtHalfBath',
+##                  'TotalBsmtSF', 'TotRmsAbvGrd', 'Kitchen', 'BsmtUnfSF', 'GarageYrBlt', 'FullBath',
+##                   'BsmtFinSF1', 'BsmtFinSF2', 'PoolArea', 'ScreenPorch',
+##                  'WoodDeckSF', 'LowQualFinSF', 'GarageArea', 'Bedroom', 'GarageCars']
+##        - interaction_terms:
+##            interactions:
+##              - "('scaled(OverallQual)','scaled(YearBuilt)')"
+##
+##

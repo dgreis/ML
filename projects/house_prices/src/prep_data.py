@@ -28,8 +28,12 @@ def main():
 
     #for filepath in [train_filepath,test_filepath]: TODO: Figure this out
     df = pd.read_csv(train_filepath,sep=",",header=None,skiprows=1,keep_default_na=False)
+    #df = pd.read_csv(train_filepath,sep=",",keep_default_na=False)
 
-    df = df.drop(64,axis=1)
+
+    #df = df.drop(64,axis=1) This is GarageQual. Highly correlated with GarageCond
+    #Maybe that is why I originally dropped it, considering the comment below, which I wrote
+    #a long time before writing this
     df.columns = range(df.shape[1])  #possible duplicate?
 
     #df = df.drop([0,38,46],axis=1) #Drop lincombo and id column
@@ -43,8 +47,8 @@ def main():
         [
             ('id','numeric'),
             ('MSSubClass', ['20','30','40','45','50','60','70','75','80',
-                            '85','90','120','160','180','190']), #Got rid of 150
-            ('MSZoning', ['C (all)','FV','RH','RL','RM']), #Got rid of RP,I,C,A
+                            '85','90','120','160','180','190','NA']), #Got rid of 150
+            ('MSZoning', ['C (all)','FV','RH','RL','RM','NA']), #Got rid of RP,I,C,A
             ('LotFrontage','numeric'),
             ('LotArea','numeric'),
             ('Street', ['Grvl', 'Pave']),
@@ -75,10 +79,10 @@ def main():
                          'WdShake','WdShngl']),
             ('Exterior1st',['AsbShng','AsphShn','BrkComm','BrkFace','CBlock','CemntBd',
                             'HdBoard','ImStucc','MetalSd','Plywood',
-                            'Stone','Stucco','VinylSd','Wd Sdng','WdShing']), #Dropped Other,PreCast
+                            'Stone','Stucco','VinylSd','Wd Sdng','WdShing', "NA"]), #Dropped Other,PreCast
             ('Exterior2nd',['AsbShng','AsphShn','Brk Cmn','BrkFace','CBlock','CmentBd',
                             'HdBoard','ImStucc','MetalSd','Other','Plywood', #Dropped PreCast
-                            'Stone','Stucco','VinylSd','Wd Sdng','Wd Shng']), #Does not match data desc file
+                            'Stone','Stucco','VinylSd','Wd Sdng','Wd Shng',"NA"]), #Does not match data desc file
             ('MasVnrType',['BrkCmn','BrkFace','None','Stone','NA']), #Does not match data desc file (NA) #Dropped CBlock
             ('MasVnrArea','numeric'),
             ('ExterQual',['Ex','Gd','TA','Fa']), #TODO: Make this numeric? #Dropped Po
@@ -87,7 +91,7 @@ def main():
             ('BsmtQual',['Ex','Gd','TA','Fa','NA']), #Dropped Po
             ('BsmtCond',['Gd','TA','Fa','Po','NA']), #Dropped Ex
             ('BsmtExposure',['Gd','Av','Mn','No','NA']),
-            ('BasmtFinType1',['GLQ','ALQ','BLQ','Rec','LwQ','Unf','NA']),
+            ('BsmtFinType1',['GLQ','ALQ','BLQ','Rec','LwQ','Unf','NA']),
             ('BsmtFinSF1','numeric'),
             ('BsmtFinType2',['GLQ','ALQ','BLQ','Rec','LwQ','Unf','NA']),
             ('BsmtFinSF2','numeric'),
@@ -107,9 +111,9 @@ def main():
             ('HalfBath','numeric'),
             ('Bedroom','numeric'),
             ('Kitchen','numeric'),
-            ('KitchenQual',['Ex','Gd','TA','Fa']), #Dropped Po
+            ('KitchenQual',['Ex','Gd','TA','Fa','NA']), #Dropped Po
             ('TotRmsAbvGrd','numeric'),
-            ('Functional',['Typ','Min1','Min2','Mod','Maj1','Maj2','Sev']), #TODO: make numeric?  #dropped Sal
+            ('Functional',['Typ','Min1','Min2','Mod','Maj1','Maj2','Sev','NA']), #TODO: make numeric?  #dropped Sal
             ('Fireplaces','numeric'),
             ('FireplaceQu',['Ex','Gd','TA','Fa','Po','NA']),
             ('GarageType',['2Types','Attchd','Basment','BuiltIn','CarPort','Detchd',
@@ -118,6 +122,7 @@ def main():
             ('GarageFinish',['Fin','RFn','Unf','NA']),
             ('GarageCars','numeric'),
             ('GarageArea','numeric'),
+            ('GarageQual', ['Ex','Gd','TA','Fa','Po','NA']),
             ('GarageCond',['Ex','Gd','TA','Fa','Po','NA']),
             ('PavedDrive',['Y','P','N']),
             ('WoodDeckSF','numeric'),
@@ -132,7 +137,7 @@ def main():
             ('MiscVal','numeric'),
             ('MoSold',['1','2','3','4','5','6','7','8','9','10','11','12']), #TODO: numeric?
             ('YrSold','numeric'),
-            ('SaleType',['WD','CWD','New','COD','Con','ConLw','ConLI','ConLD','Oth']), #dropped VWD
+            ('SaleType',['WD','CWD','New','COD','Con','ConLw','ConLI','ConLD','Oth', 'NA']), #dropped VWD
             ('SaleCondition',['Normal','Abnorml','AdjLand','Alloca','Family','Partial']),
             #('SalePrice','numeric')
              ]
@@ -172,12 +177,22 @@ def main():
             #    assert 1 == 0
             X.loc[:,col] = X.loc[:,col].copy().apply(lambda x: x if x != 'NA' else np.nan)
             Xe.loc[:,col_idx] = X.loc[:,col].astype(float)
-            Xe.loc[:,col_idx] = Xe.loc[:,col_idx].copy().fillna(Xe.loc[:,col_idx].mean()) #TODO: Make this a transfomer
+            #Xe.loc[:,col_idx] = Xe.loc[:,col_idx].copy().fillna(Xe.loc[:,col_idx].mean()) #TODO: Make this a transfomer
             feature_names.append(col)
             col_idx += 1
         else:
+            assert 0 == 0
             input_array = np.array(list(X.loc[:,col])).reshape(-1, 1)
             Xt = pd.DataFrame(enc.fit_transform(input_array))
+            int_val_map = meta_int_val_map[col]
+            for int in int_val_map:
+                if int_val_map[int] == 'NA':
+                    try:
+                        Xt.iloc[:, int] = Xt.iloc[:, int].apply(lambda x: np.nan if x == 1.0 else x)
+                    except IndexError:
+                        Xt.loc[:, int] = 0.0
+                else:
+                    pass
             Xt_w = Xt.shape[1]
             Xt.columns = [i + col_idx for i in range(Xt_w)]
             if Xe.shape[1] == 0:
@@ -197,7 +212,7 @@ def main():
     assert col_idx == Xe.shape[1]
     Xe.columns = range(col_idx)
 
-    feature_names = [x.replace(' ','_').replace('(','').replace(')','') for x in feature_names]
+    feature_names = [x.replace(' ','').replace('(','').replace(')','') for x in feature_names]
 
     clean_input_files = project_settings['clean_input_files']
     feature_names_rel_filepath = clean_input_files['feature_names']
