@@ -43,6 +43,9 @@ def load_model_configs(project_settings):
 def set_default_configs_if_missing(model_configs, project_settings):
     for model_name in model_configs['Models']:
         for facet in project_settings['model_facet_defaults']:
+            if model_configs['Models'][model_name].has_key('manipulations'):
+                print("Put manipulations within 'feature settings' in models.yaml and re-run program")
+                raise Exception
             if not model_configs['Models'][model_name].has_key(facet):
                 default = project_settings['model_facet_defaults'][facet]
                 if type(default) == str:

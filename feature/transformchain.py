@@ -158,7 +158,7 @@ class interaction_terms(TransformChain):
       <model name>
         base_algorithm: <algorithm>
           feature_settings:
-            feature_engineering:
+            manipulations:
               - interaction_terms:
                   interactions: (examples below)
                     - "('bill_sep','hist_sep')"
@@ -225,7 +225,6 @@ class box_cox_transform(TransformChain):
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(box_cox_transform, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
-
 class stack(TransformChain):
     """Example in models.yaml file:
         Models:
@@ -283,7 +282,6 @@ class stack(TransformChain):
         model_config['feature_settings']['feature_engineering'] = starting_transformations
         super(stack, self).__init__(transformer_id, starting_transformations[:exp_idx], model_config)
 
-
 class kaggle_stack(TransformChain):
     """example in yaml.file
   Model Name:
@@ -337,7 +335,6 @@ class kaggle_stack(TransformChain):
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(kaggle_stack, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
-
 class as_numeric(TransformChain):
     """Example in models.yaml file:
     Models:
@@ -368,7 +365,6 @@ class as_numeric(TransformChain):
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(as_numeric, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
-
 class encode(TransformChain):
     """
     This transformation converts numeric variables to categorical ones
@@ -396,7 +392,6 @@ class encode(TransformChain):
             i += 1
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(encode, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
-
 
 class drop_outliers(TransformChain):
     """Example yaml
@@ -427,7 +422,6 @@ class drop_outliers(TransformChain):
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(drop_outliers, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
 
-
 class delete_vars(TransformChain, Cleaner):
 
     def __init__(self, transform_chain_id, transformations, model_config, project_settings):
@@ -448,7 +442,6 @@ class delete_vars(TransformChain, Cleaner):
             i += 1
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(delete_vars, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
-
 
 class impute_vars(TransformChain, Cleaner):
 
@@ -472,7 +465,6 @@ class impute_vars(TransformChain, Cleaner):
             i += 1
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(impute_vars, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
-
 
 class handle_missing_data(TransformChain):
     """***THIS TRANSFORMER MUST BE FIRST IN LIST OF MANIPULATIONS. DATA WILL BE DELETED IF NOT***
