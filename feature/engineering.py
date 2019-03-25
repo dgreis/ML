@@ -325,6 +325,7 @@ class basis_expansion(Transformer):
             raise Exception
 
 class linear_combination(Transformer):
+    #TODO: Add support for addition of constants, so you don't end up dividing by zero
     """
     For now linear_combination only supports simple mathematical operators (+,-,/,*)
     Support must still be implemented for multiplicative coefficients or power-raising.
@@ -344,7 +345,7 @@ class linear_combination(Transformer):
         transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
         expression = transformer_settings['expression']
         #TODO: This will get more complicated once we start doing coefficients or powers
-        inclusion_patterns = [x.strip() for x in re.split('[\+\*\\-]', expression)]
+        inclusion_patterns = [x.strip() for x in re.split('[\+\*/-]', expression)]
         transformer_settings['inclusion_patterns'] = inclusion_patterns
         model_config = self.update_model_config(transformer_id, transformer_settings, model_config)
         super(linear_combination, self).__init__(transformer_id, model_config, project_settings)
@@ -371,7 +372,7 @@ class linear_combination(Transformer):
         touch_indices = self.touch_indices
         assert len(inclusion_patterns) == len(touch_indices)
         expression = self.expression
-        operator_regex = re.compile(r"[\+\*\\-]")
+        operator_regex = re.compile(r"[\+\*/-]")
         operators = operator_regex.findall(expression)
         assert len(operators) == len(inclusion_patterns) - 1
         expression_str = 'X_touch.loc[:, ' + str(touch_indices[0]) + ']'
@@ -400,9 +401,15 @@ class ind_interaction_terms(basis_expansion):
     def configure_features(self):
         prior_features = self.load_prior_features()
         inclusion_patterns = self.inclusion_patterns
-        if not pd.Series([x in prior_features.values() for x in inclusion_patterns]).any():
-            print "Specified interaction: (" + ', '.join(inclusion_patterns) + ') not available at run-time. Please remove from yaml file'
-            raise Exception
+        matches = list()
+        for ip in inclusion_patterns:
+            matches_ip = [ip in pf for pf in prior_features.values()]
+            matches = matches + matches_ip
+        try:
+            assert pd.Series(matches).any()
+        except AssertionError:
+             print "Specified interaction: (" + ', '.join(inclusion_patterns) + ') not available at run-time. Please remove from yaml file'
+             raise Exception
         base_features = dict()
         col_indices = list()
         for key in prior_features:
@@ -450,22 +457,43 @@ class ind_interaction_terms(basis_expansion):
     def transform(self, X_touch, y_touch, **kwargs): #TODO: is there a way I could remove unused y_touch's from these signatures?
         pairwise_int_transformer_dict = self.pairwise_int_transformer_dict
         pairwise_ints = pairwise_int_transformer_dict.keys()
-        X_touched = pd.DataFrame() #pandas dependent, as usual
+        feat_col_dict = { 'f0' : pd.DataFrame(), 'f1' : pd.DataFrame()}
+        intr_df = pd.DataFrame()
+        #X_touched = pd.DataFrame() #pandas dependent, as usual
+        i = 0
         for pwi in pairwise_ints:
             transformer_i = pairwise_int_transformer_dict[pwi]
-            Xt = transformer_i.transform(X_touch.loc[:, pwi])
-            X_touched_i = pd.DataFrame(Xt, index=X_touch.index)
-            X_touched = pd.concat([X_touched, X_touched_i],axis=1)
-        assert X_touched.shape[1] == len(pairwise_ints) * 3
+            X_t = transformer_i.transform(X_touch.loc[:, pwi])
+            X_touched_pwi = pd.DataFrame(X_t, index=X_touch.index)
+            for n in [0,1]:
+                if pwi[n] not in feat_col_dict['f' + str(n)].columns:
+                    col_idx = pwi[n]
+                    feat_col_dict['f' + str(n)].loc[:,col_idx] = X_touched_pwi.loc[:,n]
+                else:
+                    pass
+            intr_df.loc[:,i] = X_touched_pwi.loc[:,2]
+            i += 1
+        f0_df, f1_df = feat_col_dict['f0'], feat_col_dict['f1']
+        X_touched = pd.concat([f0_df, f1_df, intr_df],axis=1)
+        assert X_touched.shape[1] == f0_df.shape[1] * f1_df.shape[1] + f0_df.shape[1] + f1_df.shape[1]
         return X_touched, y_touch
 
     def gen_new_column_names(self, touch_indices, prior_features):
         expanded_interactions = self.expanded_interactions
-        new_features = list()
+        feat_col_dict = {'f0_names' : list(), 'f1_names': list()}
+        intr_names = list()
         for inter in expanded_interactions:
-            new_features = new_features + list(inter)
+            for n in [0,1]:
+                col_list = feat_col_dict['f' + str(n) + '_names']
+                if inter[n] not in col_list:
+                    col_list = col_list + [inter[n]]
+                    feat_col_dict['f' + str(n) + '_names'] = col_list
+                else:
+                    pass
             inter_term_name = 'inter(' + inter[0] + 'x%x' + inter[1] + ')'
-            new_features = new_features + [inter_term_name]
+            intr_names = intr_names + [inter_term_name]
+        f0_names, f1_names = feat_col_dict['f0_names'], feat_col_dict['f1_names']
+        new_features = f0_names + f1_names + intr_names
         return new_features
 
 class normalize(Transformer):

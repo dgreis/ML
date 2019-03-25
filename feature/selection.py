@@ -221,7 +221,7 @@ class f_based(Filter):
      Models:
        <Model Name>
          feature_settings:
-           feature_selection:
+           manipulations:
             - f_based:
                method: <str> i.e. 'regression or classif'
                keyword_arg_settings: {}

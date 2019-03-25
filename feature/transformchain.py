@@ -18,15 +18,19 @@ class TransformChain(ManipulatorChain):
             transformer_class = self._get_transformer_class(transformer_class_name)
             if issubclass(transformer_class, TransformChain):
                 transform_chain_class = transformer_class
-                #tc instance is discarded in next line because its work is done updating manipulations in model_config
-                _ = transform_chain_class(transformer_id, starting_transformations, model_config, project_settings)
-                updated_transformations = model_config['feature_settings']['manipulations']
+                tc = transform_chain_class(transformer_id, starting_transformations, model_config, project_settings)
+                #updated_transformations = model_config['feature_settings']['manipulations']
+                updated_transformations = tc.transformations
+                #switched line above back to what it was before. I ran into issue where filters were being included
+                #on transformchains when they didn't belong, during forest_cover project (had interactions then a filter
+                #for filter selection. Keep in mind this case when this change blows something else up.
             else:
                 transformer_instance = transformer_class(transformer_id, model_config, project_settings)
                 transformer_entry[transformer_id]['initialized_manipulator'] = transformer_instance
                 updated_transformations = updated_transformations + [transformer_entry]
         super(TransformChain, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
         self.transformations = updated_transformations
+        assert len(self.transformations) > 0
 
     def _get_transformer_class(self, transformer_class_name):
         engineering_module = importlib.import_module('feature.engineering')

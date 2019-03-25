@@ -94,6 +94,7 @@ class Manager:
         if len(chain_of_chains) > 0:
             for chain in chain_of_chains:
                 X_t, y_t = chain.fit_transform(X, y, dataset_name)
+                X, y = X_t, y_t
         else:
             X_t, y_t = X, y
 
@@ -109,6 +110,7 @@ class Manager:
         if len(chain_of_chains) > 0:
             for chain in chain_of_chains:
                 X_t, y_t = chain.transform(X, y, dataset_name)
+                X, y = X_t, y_t
         else:
             X_t, y_t = X, y
 
@@ -156,6 +158,7 @@ class Manager:
             has_cleaner = False
         le = self.leak_enforcer
         if not has_cleaner:
+            i = 0
             delete_obs_entry = { 'auto.delete_obs': { 'inclusion_patterns' : 'All' }}
             model_config['feature_settings']['manipulations'] = [delete_obs_entry] + manipulations
             auto_delete_tc = TransformChain('auto_delete_tc', [delete_obs_entry],
@@ -172,8 +175,13 @@ class Manager:
             X, y = cleaners_tc.fit_transform(X, y, 'train')
 
         chain_of_chains = self.chain_of_chains
-        first_transform_chain = chain_of_chains[0]
-        first_transform_chain.transformations = manipulations[i:]
+        try:
+            first_transform_chain = chain_of_chains[0]
+            old_transformations = first_transform_chain.transformations
+            new_transformations = old_transformations[i-1:]
+            first_transform_chain.transformations = new_transformations
+        except IndexError:
+            pass
 
         return X, y
 
