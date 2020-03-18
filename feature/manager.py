@@ -178,13 +178,12 @@ class Manager:
         try:
             first_transform_chain = chain_of_chains[0]
             old_transformations = first_transform_chain.transformations
-            new_transformations = old_transformations[i-1:]
+            new_transformations = old_transformations[max(i-1,0):]
             first_transform_chain.transformations = new_transformations
         except IndexError:
             pass
 
         return X, y
-
 
     def _find_last_cleaner(self, manipulations):
         i = 0
