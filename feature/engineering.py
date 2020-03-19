@@ -390,6 +390,20 @@ class ind_trig_op(ind_operator):
         keep_cols = self.keep_cols
         self.set_base_transformer(ExpressionEvaluator(eval_str,keep_cols))
 
+class ind_constant_op(ind_operator):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_constant_op, self).__init__(transformer_id, model_config, project_settings)
+
+    def fit(self, X_mat, y, **kwargs):
+        inclusion_patterns = self.inclusion_patterns
+        touch_indices = self.touch_indices
+        assert len(inclusion_patterns) == len(touch_indices) == 1
+        operator = self.operator
+        eval_str =  'X_touch.loc[:, ' + str(touch_indices[0]) + ']' + operator
+        keep_cols = self.keep_cols
+        self.set_base_transformer(ExpressionEvaluator(eval_str,keep_cols))
+
 class ind_interaction_terms(basis_expansion):
 
     def __init__(self, transformer_id, model_config, project_settings):

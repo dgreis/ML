@@ -31,10 +31,7 @@ class TransformChain(ManipulatorChain):
                 updated_transformations = updated_transformations + [transformer_entry]
         super(TransformChain, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
         self.transformations = updated_transformations
-        try:
-            assert len(self.transformations) > 0
-        except AssertionError:
-            assert 1 == 0
+        assert len(self.transformations) > 0
 
     def _get_transformer_class(self, transformer_class_name):
         engineering_module = importlib.import_module('feature.engineering')
@@ -212,15 +209,14 @@ class linear_combination(TransformChain):
         Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
         lincomb_entry = self.fetch_manipulator_settings(model_config)
         expression = lincomb_entry['expression']
-        self.pattern = "[\+\*\/-]\s?\d(?:\s|\Z)|[\+\*\/-]|cos|sin"
+        #self.pattern = "[\+\*\/-]\s?\d(?:\s|\Z)|[\+\*\/-]|cos|sin"
+        self.pattern = "[\+\*\/-]\s[\d\.]+|[\+\*\/-]|cos|sin"
         rel_cols = list(filter(lambda x: len(x) > 0, [x.strip('()\ ') for x in re.split(self.pattern, expression)]))
         operator_regex = re.compile(self.pattern)
-        operator_raw_strs = iter(operator_regex.findall(expression))
+        operator_raw_strs = operator_regex.findall(expression)
         expanded_transformations = list()
         i = 0
-        inter_rel_cols = list()
-        while len(rel_cols) >= 1:
-            raw_str = next(operator_raw_strs)
+        for raw_str in operator_raw_strs:
             operator_type = self.determine_operator(raw_str)
             if operator_type == 'primal_op':
                 inclusion_patterns = rel_cols[0:2]
@@ -228,7 +224,7 @@ class linear_combination(TransformChain):
             else:
                 inclusion_patterns = [rel_cols[0]]
                 rel_cols = rel_cols[1:]
-            if len(rel_cols) == 0:
+            if i + 1 == len(operator_raw_strs):
                 col_name = lincomb_entry['equals']
                 keep_cols = lincomb_entry['keep_cols']
             else:
@@ -243,6 +239,7 @@ class linear_combination(TransformChain):
                 'kwargs': {}
             }
             expanded_transformations.append(transformation_dict)
+            rel_cols = [col_name] + rel_cols
             i += 1
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(linear_combination, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
@@ -250,7 +247,7 @@ class linear_combination(TransformChain):
     def determine_operator(self, raw_str):
         try:
             eval( str(1) + raw_str)
-            return 'constant'
+            return 'constant_op'
         except SyntaxError:
             pass
         if raw_str.strip() in ['+','-','/','*']:
@@ -259,8 +256,6 @@ class linear_combination(TransformChain):
             return 'trig_op'
         else:
             raise Exception
-
-
 
 class box_cox_transform(TransformChain):
 
