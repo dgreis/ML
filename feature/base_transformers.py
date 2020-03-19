@@ -369,4 +369,3 @@ class ExpressionEvaluator:
         else:
             X_touched = eval(fully_qualified_expression)
         return X_touched
-

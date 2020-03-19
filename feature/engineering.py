@@ -324,8 +324,7 @@ class basis_expansion(Transformer):
         else:
             raise Exception
 
-class linear_combination(Transformer):
-    #TODO: Add support for addition of constants, so you don't end up dividing by zero
+class ind_primal_op(Transformer):
     """
     For now linear_combination only supports simple mathematical operators (+,-,/,*)
     Support must still be implemented for multiplicative coefficients or power-raising.
@@ -342,13 +341,8 @@ class linear_combination(Transformer):
             keep_cols: False
     """
     def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_primal_op, self).__init__(transformer_id, model_config, project_settings)
         transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
-        expression = transformer_settings['expression']
-        #TODO: This will get more complicated once we start doing coefficients or powers
-        inclusion_patterns = [x.strip() for x in re.split('[\+\*/-]', expression)]
-        transformer_settings['inclusion_patterns'] = inclusion_patterns
-        model_config = self.update_model_config(transformer_id, transformer_settings, model_config)
-        super(linear_combination, self).__init__(transformer_id, model_config, project_settings)
         equals = transformer_settings['equals']
         if 'keep_cols' in transformer_settings:
             keep_cols = transformer_settings['keep_cols']
@@ -356,7 +350,7 @@ class linear_combination(Transformer):
             keep_cols = True
         self.keep_cols = keep_cols
         self.equals = equals
-        self.expression = expression
+        self.operator = transformer_settings['operator']
         self.set_base_transformer(None)
 
     def update_model_config(self, transformer_id, new_config, model_config):
@@ -370,19 +364,14 @@ class linear_combination(Transformer):
     def fit(self, X_mat, y, **kwargs):
         inclusion_patterns = self.inclusion_patterns
         touch_indices = self.touch_indices
-        assert len(inclusion_patterns) == len(touch_indices)
-        expression = self.expression
-        operator_regex = re.compile(r"[\+\*/-]")
-        operators = operator_regex.findall(expression)
-        assert len(operators) == len(inclusion_patterns) - 1
-        expression_str = 'X_touch.loc[:, ' + str(touch_indices[0]) + ']'
-        for i in range(len(operators)):
-            rel_col = touch_indices[i+1]
-            rel_opr = operators[i]
-            expression_str = expression_str + ' ' + rel_opr + ' ' + 'X_touch.loc[:, ' +\
-                             str(rel_col) + ']'
+        assert len(inclusion_patterns) == len(touch_indices) == 2
+        operator = self.operator
+        eval_str = 'X_touch.loc[:, ' + str(touch_indices[0]) + ']'
+        rel_col = touch_indices[1]
+        eval_str = eval_str + ' ' + operator + ' ' + 'X_touch.loc[:, ' +\
+                            str(rel_col) + ']'
         keep_cols = self.keep_cols
-        self.set_base_transformer(ExpressionEvaluator(expression_str,keep_cols))
+        self.set_base_transformer(ExpressionEvaluator(eval_str,keep_cols))
 
     def gen_new_column_names(self, touch_indices, prior_features):
         keep_cols = self.keep_cols

@@ -1,6 +1,7 @@
 import importlib
 import itertools
 import time
+import re
 
 import pandas as pd
 
@@ -186,6 +187,78 @@ class interaction_terms(TransformChain):
                 i += 1
         updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
         super(interaction_terms, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
+
+class linear_combination(TransformChain):
+    """
+    linear_combination now supports simple mathematical operators (+,-,/,*), multiplicative or
+    additive constants (as long as they're put after a variable), and sin/cos.
+    Support must still be implemented for power-raising.
+
+    keep_cols parameter (not required) determines whether columns specified in expression will be kept or
+    dropped. Default is to keep. expression and equals parameters are required.
+
+    sample yaml usage:
+    ...
+    manipulations:
+        - linear_combination:
+            expression: 'TotalBsmtSF + 1stFlrSF + 2ndFlrSF'
+            equals: 'NewTestCol'
+            keep_cols: False
+    """
+    def __init__(self, transform_chain_id, transformations, model_config, project_settings):
+        Manipulator.__init__(self, transform_chain_id, model_config, project_settings)
+        lincomb_entry = self.fetch_manipulator_settings(model_config)
+        expression = lincomb_entry['expression']
+        self.pattern = "[\+\*\/-]\s?\d(?:\s|\Z)|[\+\*\/-]|cos|sin"
+        rel_cols = list(filter(lambda x: len(x) > 0, [x.strip('()\ ') for x in re.split(self.pattern, expression)]))
+        operator_regex = re.compile(self.pattern)
+        operator_raw_strs = iter(operator_regex.findall(expression))
+        expanded_transformations = list()
+        i = 0
+        inter_rel_cols = list()
+        while len(rel_cols) > 1:
+            raw_str = next(operator_raw_strs)
+            operator_type = self.determine_operator(raw_str)
+            if operator_type == 'primal_op':
+                inclusion_patterns = rel_cols[0:2]
+                rel_cols = rel_cols[2:]
+            else:
+                inclusion_patterns = rel_cols[0]
+                rel_cols = rel_cols[1:]
+            if len(rel_cols) == 0:
+                col_name = lincomb_entry['equals']
+                keep_cols = lincomb_entry['keep_cols']
+            else:
+                col_name = 'inter_quant_' + str(i)
+                keep_cols = False
+            rel_cols = inter_rel_cols + rel_cols
+            transformation_dict = dict()
+            transformation_dict['int' + str(i) + '.' + 'ind_' + operator_type] = {
+                'inclusion_patterns': inclusion_patterns,
+                'operator': raw_str.strip(),
+                'equals': col_name,
+                'keep_cols': keep_cols,
+                'kwargs': {}
+            }
+            expanded_transformations.append(transformation_dict)
+            i += 1
+        updated_transformations = self.update_manipulations_and_transformations(expanded_transformations)
+        super(linear_combination, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
+
+    def determine_operator(self, raw_str):
+        try:
+            eval( str(1) + raw_str)
+            return 'constant'
+        except SyntaxError:
+            pass
+        if raw_str.strip() in ['+','-','/','*']:
+            return 'primal_op'
+        elif raw_str in ['cos','sin']:
+            return 'trig'
+        else:
+            raise Exception
+
+
 
 class box_cox_transform(TransformChain):
 
