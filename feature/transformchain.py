@@ -31,7 +31,10 @@ class TransformChain(ManipulatorChain):
                 updated_transformations = updated_transformations + [transformer_entry]
         super(TransformChain, self).__init__(transform_chain_id, updated_transformations, model_config, project_settings)
         self.transformations = updated_transformations
-        assert len(self.transformations) > 0
+        try:
+            assert len(self.transformations) > 0
+        except AssertionError:
+            assert 1 == 0
 
     def _get_transformer_class(self, transformer_class_name):
         engineering_module = importlib.import_module('feature.engineering')
@@ -216,14 +219,14 @@ class linear_combination(TransformChain):
         expanded_transformations = list()
         i = 0
         inter_rel_cols = list()
-        while len(rel_cols) > 1:
+        while len(rel_cols) >= 1:
             raw_str = next(operator_raw_strs)
             operator_type = self.determine_operator(raw_str)
             if operator_type == 'primal_op':
                 inclusion_patterns = rel_cols[0:2]
                 rel_cols = rel_cols[2:]
             else:
-                inclusion_patterns = rel_cols[0]
+                inclusion_patterns = [rel_cols[0]]
                 rel_cols = rel_cols[1:]
             if len(rel_cols) == 0:
                 col_name = lincomb_entry['equals']
@@ -231,7 +234,6 @@ class linear_combination(TransformChain):
             else:
                 col_name = 'inter_quant_' + str(i)
                 keep_cols = False
-            rel_cols = inter_rel_cols + rel_cols
             transformation_dict = dict()
             transformation_dict['int' + str(i) + '.' + 'ind_' + operator_type] = {
                 'inclusion_patterns': inclusion_patterns,
@@ -254,7 +256,7 @@ class linear_combination(TransformChain):
         if raw_str.strip() in ['+','-','/','*']:
             return 'primal_op'
         elif raw_str in ['cos','sin']:
-            return 'trig'
+            return 'trig_op'
         else:
             raise Exception
 

@@ -324,24 +324,10 @@ class basis_expansion(Transformer):
         else:
             raise Exception
 
-class ind_primal_op(Transformer):
-    """
-    For now linear_combination only supports simple mathematical operators (+,-,/,*)
-    Support must still be implemented for multiplicative coefficients or power-raising.
+class ind_operator(Transformer):
 
-    keep_cols parameter (not required) determines whether columns specified in expression will be kept or
-    dropped. Default is to keep. expression and equals parameters are required.
-
-    sample yaml usage:
-    ...
-    manipulations:
-        - linear_combination:
-            expression: 'TotalBsmtSF + 1stFlrSF + 2ndFlrSF'
-            equals: 'NewTestCol'
-            keep_cols: False
-    """
     def __init__(self, transformer_id, model_config, project_settings):
-        super(ind_primal_op, self).__init__(transformer_id, model_config, project_settings)
+        super(ind_operator, self).__init__(transformer_id, model_config, project_settings)
         transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
         equals = transformer_settings['equals']
         if 'keep_cols' in transformer_settings:
@@ -362,6 +348,23 @@ class ind_primal_op(Transformer):
         return model_config
 
     def fit(self, X_mat, y, **kwargs):
+        raise NotImplementedError
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        keep_cols = self.keep_cols
+        equals = self.equals
+        if not keep_cols:
+            new_features =  [equals]
+        else:
+            new_features = [prior_features[i] for i in touch_indices] + [equals]
+        return new_features
+
+class ind_primal_op(ind_operator):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_primal_op, self).__init__(transformer_id, model_config, project_settings)
+
+    def fit(self, X_mat, y, **kwargs):
         inclusion_patterns = self.inclusion_patterns
         touch_indices = self.touch_indices
         assert len(inclusion_patterns) == len(touch_indices) == 2
@@ -373,14 +376,19 @@ class ind_primal_op(Transformer):
         keep_cols = self.keep_cols
         self.set_base_transformer(ExpressionEvaluator(eval_str,keep_cols))
 
-    def gen_new_column_names(self, touch_indices, prior_features):
+class ind_trig_op(ind_operator):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(ind_trig_op, self).__init__(transformer_id, model_config, project_settings)
+
+    def fit(self, X_mat, y, **kwargs):
+        inclusion_patterns = self.inclusion_patterns
+        touch_indices = self.touch_indices
+        assert len(inclusion_patterns) == len(touch_indices) == 1
+        operator = self.operator
+        eval_str = 'np.' + operator + '(X_touch.loc[:, ' + str(touch_indices[0]) + '])'
         keep_cols = self.keep_cols
-        equals = self.equals
-        if not keep_cols:
-            new_features =  [equals]
-        else:
-            new_features = [prior_features[i] for i in touch_indices] + [equals]
-        return new_features
+        self.set_base_transformer(ExpressionEvaluator(eval_str,keep_cols))
 
 class ind_interaction_terms(basis_expansion):
 
