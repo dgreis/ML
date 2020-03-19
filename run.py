@@ -10,7 +10,7 @@ from feature.manager import Manager
 from report import Report
 from algorithms.algoutils import configure_algorithm
 
-global_settings = yaml.load(open('./global_settings.yaml'))
+global_settings = yaml.safe_load(open('./global_settings.yaml'))
 project_settings = configure_project_settings(global_settings)
 
 #TODO: some sort of clean-up of feature files so that program doesn't mistakenly use from past runs

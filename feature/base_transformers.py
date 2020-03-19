@@ -25,14 +25,14 @@ class InvOneHotEncoder:
                 try:
                     assert value in val_map.keys()
                 except AssertionError:
-                    print value + " is not in val_map for feature " + prior_feature_col.split('_', )[0]
+                    print(value + " is not in val_map for feature " + prior_feature_col.split('_', )[0])
                     raise Exception
                 idx_val_map[ti] = float(val_map[value])
             else:
                 try:
                     idx_val_map[ti] = float(idx_val_map[ti])
                 except ValueError:
-                    print "Specify a val_map for feature " + prior_feature_col.split('_', )[0]
+                    print("Specify a val_map for feature " + prior_feature_col.split('_', )[0])
                     raise Exception
                     #TODO: include this in Exception message
 
@@ -245,7 +245,7 @@ class Stacker:
             assert len(y_hat) == 1
             loo_vals[i] = y_hat[0]
             if (cnt % 100 == 0) and (cnt != 0):
-                print '\t\tLOO proc completed ' + str(cnt) + ' times'
+                print('\t\tLOO proc completed ' + str(cnt) + ' times')
             cnt += 1
         self.loo_vals = loo_vals
         stacker_algo_full = stacker_algo_class(**self.keyword_arg_settings)

@@ -12,7 +12,7 @@ class Wrapper(Manipulator):
         other_options = model_config['other_options']
         self.model_name = model_config['model_name']
         self.base_algorithm = base_algorithm_class(**kwargs)
-        if other_options.has_key('gen_output'):
+        if 'gen_output' in other_options:
             arg_val = other_options['gen_output']
             self.gen_output_flag = arg_val
         else:

@@ -19,14 +19,14 @@ def configure_project_settings(global_settings):
     repo_loc = global_settings['repo_loc']
     abs_project_dir = repo_loc + '/projects/' + global_settings['current_project']
     project_settings_loc = abs_project_dir + '/src/project_settings.yaml'
-    project_settings = yaml.load(open(project_settings_loc))
+    project_settings = yaml.safe_load(open(project_settings_loc))
     new_settings = global_settings.copy()
     #new_settings.update(project_settings)
     new_settings = update(new_settings, project_settings)
     return new_settings
 
 def update(d, u):
-    for k, v in u.iteritems():
+    for k, v in u.items():
         if isinstance(v, collections.Mapping):
             d[k] = update(d.get(k, {}), v)
         else:
@@ -36,17 +36,17 @@ def update(d, u):
 def load_model_configs(project_settings):
     abs_project_dir = find_project_dir(project_settings)
     model_configs_loc = abs_project_dir + '/src/models.yaml'
-    raw_model_configs = yaml.load(open(model_configs_loc))
+    raw_model_configs = yaml.safe_load(open(model_configs_loc))
     model_configs = set_default_configs_if_missing(raw_model_configs, project_settings)
     return model_configs
 
 def set_default_configs_if_missing(model_configs, project_settings):
     for model_name in model_configs['Models']:
         for facet in project_settings['model_facet_defaults']:
-            if model_configs['Models'][model_name].has_key('manipulations'):
+            if 'manipulations' in model_configs['Models'][model_name]:
                 print("Put manipulations within 'feature settings' in models.yaml and re-run program")
                 raise Exception
-            if not model_configs['Models'][model_name].has_key(facet):
+            if facet not in model_configs['Models'][model_name]:
                 default = project_settings['model_facet_defaults'][facet]
                 if type(default) == str:
                     model_configs['Models'][model_name][facet] = eval(default)
@@ -55,7 +55,7 @@ def set_default_configs_if_missing(model_configs, project_settings):
             elif facet == 'feature_settings':
                 default_feature_settings = project_settings['model_facet_defaults']['feature_settings']
                 for sub_facet in default_feature_settings:
-                    if not model_configs['Models'][model_name]['feature_settings'].has_key(sub_facet):
+                    if not sub_facet in model_configs['Models'][model_name]['feature_settings']:
                         model_configs['Models'][model_name]['feature_settings'][sub_facet] = default_feature_settings[sub_facet]
     return model_configs
 
@@ -69,7 +69,7 @@ def all_clean_input_files_exist(project_settings):
     return True
 
 def flip_dict(orig_dict):
-    flipped_dict = {v:k for k,v in orig_dict.iteritems()}
+    flipped_dict = {v:k for k,v in orig_dict.items()}
     return flipped_dict
 
 def is_fully_qualified_path(project_settings, path):
@@ -103,12 +103,12 @@ def load_clean_input_file_filepath(project_settings, data_ref):
     return cif_abs_filepath
 
 def det_num_cv_folds(model_config, project_settings):
-    if model_config.has_key('cv_num_folds'):
+    if 'cv_num_folds' in model_config:
         if model_config['cv_num_folds'] < 2:
             try:
                 assert model_config.has_key('train_val_split')
             except AssertionError:
-                print "If not performing CV please specify train/val split with 'train_val_split' in yaml"
+                print("If not performing CV please specify train/val split with 'train_val_split' in yaml")
                 raise Exception
             #train_val_split = model_config['train_val_split']
             #implied_folds = float.as_integer_ratio(train_val_split)[1]
@@ -120,7 +120,7 @@ def det_num_cv_folds(model_config, project_settings):
         return project_settings['assessment']['cv_num_folds']
 
 def finalize_manipulations(model_config, project_settings):
-    if model_config['feature_settings'].has_key('preprocess_config'):
+    if 'preprocess_config' in model_config['feature_settings']:
         preprocess_config_name = model_config['feature_settings']['preprocess_config']
         try:
             assert project_settings.has_key('preprocess_configs') and project_settings['preprocess_configs'].has_key(

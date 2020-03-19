@@ -13,8 +13,8 @@ class TransformChain(ManipulatorChain):
     def __init__(self, transform_chain_id, starting_transformations, model_config, project_settings):
         updated_transformations = list()
         for transformer_entry in starting_transformations:
-            transformer_id = transformer_entry.keys()[0]
-            transformer_class_name = transformer_entry.keys()[0].split('.')[-1:][0]
+            transformer_id = list(transformer_entry.keys())[0]
+            transformer_class_name = list(transformer_entry.keys())[0].split('.')[-1:][0]
             transformer_class = self._get_transformer_class(transformer_class_name)
             if issubclass(transformer_class, TransformChain):
                 transform_chain_class = transformer_class
@@ -54,7 +54,7 @@ class TransformChain(ManipulatorChain):
         else:
             i = 1
             for d in transformations:
-                transformer_name = d.keys()[0]
+                transformer_name = list(d.keys())[0]
                 transformer = d[transformer_name]['initialized_manipulator']
                 transformer_class = transformer.__class__
                 if fit_transform:

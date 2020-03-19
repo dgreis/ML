@@ -3,9 +3,9 @@ from __future__ import print_function
 import copy
 import pandas as pd
 import numpy as np
+import itertools
 
 from evaluation import load_evaluation_battery
-from itertools import izip, product
 from sklearn.model_selection import KFold
 from feature.manager import Manager
 from algorithms.algoutils import configure_algorithm
@@ -20,7 +20,7 @@ class CrossValidator:
             for param in hyper_params:
                 grid_template[param] = eval(hyper_params[param])
                 #TODO: This logic needs to be changed for new strategies, like random
-            self.grid = list(dict(izip(grid_template, x)) for x in product(*grid_template.itervalues()))
+            self.grid = list(dict(zip(grid_template, x)) for x in itertools.product(*grid_template.itervalues()))
             self.hyperparam_eval_metric = model_config['hyperparam_tuning_settings']['eval_metric']
         else:
             self.tune_hyperparams = False

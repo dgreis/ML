@@ -2,7 +2,7 @@ import pandas as pd
 import importlib
 import copy
 
-from manipulator import ManipulatorChain, Manipulator
+from .manipulator import ManipulatorChain, Manipulator
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
 from algorithms.classification import DecisionTreeClassifier
 from algorithms.regression import DecisionTreeRegressor

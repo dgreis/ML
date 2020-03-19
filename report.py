@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from collections import defaultdict
 from utils import update, find_project_dir
@@ -87,9 +88,18 @@ class Report:
     def create_cr_table(self,blob):
         # Parse rows
         tmp = list()
+        i = 0
         for row in blob.split("\n"):
             parsed_row = [x for x in row.split("  ") if len(x) > 0]
-            if len(parsed_row) > 0:
+            if i == 0:
+                tmp.append(parsed_row)
+                i += 1
+                continue
+            elif len(parsed_row) > 0 and len(parsed_row) != len(tmp[0]) + 1:
+                filled_dims = len(parsed_row[1:])
+                parsed_row = [parsed_row[0]] + (len(tmp[0])-filled_dims) * [np.nan] + parsed_row[-filled_dims:]
+                tmp.append(parsed_row)
+            elif len(parsed_row) > 0:
                 tmp.append(parsed_row)
 
         # Store in dictionary
@@ -98,7 +108,7 @@ class Report:
         D_class_data = defaultdict(dict)
         for row in tmp[1:]:
             class_label = row[0]
-            for j, m in enumerate(measures):
-                D_class_data[class_label][m.strip()] = float(row[j + 1].strip())
+            for j, m in list(enumerate(measures)):
+                D_class_data[class_label][m.strip()] = float(row[j + 1])
         return pd.DataFrame(D_class_data).T
 

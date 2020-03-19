@@ -9,7 +9,7 @@ import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Deleter, Identity, \
     Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer, Recoder, ExpressionEvaluator
-from manipulator import ManipulatorChain, Manipulator
+from .manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
 from algorithms.algoutils import get_algo_class
@@ -34,12 +34,12 @@ class Transformer(Manipulator):
         else:
             transformer_settings = self.fetch_transform_settings(model_config,transformer_name)
             self.base_transformer = None
-            if transformer_settings.has_key('kwargs'):
+            if 'kwargs' in transformer_settings:
                 kwargs = transformer_settings['kwargs']
             else:
                 kwargs = dict()
             self.kwargs = kwargs
-            if transformer_settings.has_key('store_output'):
+            if 'store_output' in transformer_settings:
                 self.store = True
             else:
                 self.store = False
@@ -52,7 +52,7 @@ class Transformer(Manipulator):
         try:
             assert len(touch_indices) > 0 #This check might be redundant with the one in the Transformer.fit() method
         except AssertionError:
-            print "Warning: " + self.manipulator_name + " is about touch 0 relevant columns."
+            print("Warning: " + self.manipulator_name + " is about touch 0 relevant columns.")
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
         if not isinstance(self, HorizontalTransformer):
@@ -80,7 +80,7 @@ class Transformer(Manipulator):
                 try:
                     assert len(updated_inclusion_patterns) > 0
                 except AssertionError:
-                    print self.manipulator_name + " tries to get all numeric features but none exist at run-time"
+                    print (self.manipulator_name + " tries to get all numeric features but none exist at run-time")
                     raise Exception
             elif type(inclusion_patterns) == list:
                 updated_inclusion_patterns = inclusion_patterns
@@ -108,7 +108,7 @@ class Transformer(Manipulator):
     def fetch_transform_settings(self,model_config, transformer_name):
         feature_eng_settings = model_config['feature_settings']['manipulations']
         for item in feature_eng_settings:
-            if item.keys()[0] == transformer_name:
+            if list(item.keys())[0] == transformer_name:
                 transform_settings = item[transformer_name]
             else:
                 pass
@@ -124,7 +124,7 @@ class Transformer(Manipulator):
             # Check that all columns due to be touched are in inclusion patterns
             assert pd.Series([pattern in prior_features.values() for pattern in inclusion_patterns ]).all()
         except AssertionError:
-            print "inclusion patterns of " + self.manipulator_name + " don't exist in data at runtime. Please remove and re-run"
+            print("inclusion patterns of " + self.manipulator_name + " don't exist in data at runtime. Please remove and re-run")
             raise Exception
         self.base_transformer.fit(X_mat, y)
 
@@ -180,7 +180,7 @@ class Transformer(Manipulator):
                 col_indices = prior_features.keys()
                 col_names = prior_features.values()
                 relevant_pattern_columns = self.det_relevant_columns(pattern, col_names)
-                include_columns = include_columns + relevant_pattern_columns
+                include_columns = include_columns + list(relevant_pattern_columns)
             inv_working_features = flip_dict(prior_features)
             touch_indices = [int(inv_working_features[col_name]) for col_name in include_columns]
             untouched_indices = list(set(col_indices).difference(set(touch_indices)))
@@ -213,7 +213,7 @@ class Transformer(Manipulator):
         assert len(features) == X_transform.shape[1]
         X_transform.columns = range(len(features))
         if y_untouched is not None:
-            print "this is mean to be a vertical transform. y_touched is not None which seems like a horizontal transform"
+            print("this is mean to be a vertical transform. y_touched is not None which seems like a horizontal transform")
             raise Exception
         return X_transform, y_touched
 
@@ -350,7 +350,7 @@ class linear_combination(Transformer):
         model_config = self.update_model_config(transformer_id, transformer_settings, model_config)
         super(linear_combination, self).__init__(transformer_id, model_config, project_settings)
         equals = transformer_settings['equals']
-        if transformer_settings.has_key('keep_cols'):
+        if 'keep_cols' in transformer_settings:
             keep_cols = transformer_settings['keep_cols']
         else:
             keep_cols = True
@@ -361,7 +361,7 @@ class linear_combination(Transformer):
 
     def update_model_config(self, transformer_id, new_config, model_config):
         manipulations = model_config['feature_settings']['manipulations']
-        manipulator_map = dict(zip(range(len(manipulations)),[x.keys()[0] for x in manipulations]))
+        manipulator_map = dict(zip(range(len(manipulations)),[list(x.keys())[0] for x in manipulations]))
         inv_man_map = flip_dict(manipulator_map)
         t_idx = inv_man_map[transformer_id]
         model_config['feature_settings']['manipulations'][t_idx][transformer_id] = new_config
@@ -408,7 +408,7 @@ class ind_interaction_terms(basis_expansion):
         try:
             assert pd.Series(matches).any()
         except AssertionError:
-             print "Specified interaction: (" + ', '.join(inclusion_patterns) + ') not available at run-time. Please remove from yaml file'
+             print("Specified interaction: (" + ', '.join(inclusion_patterns) + ') not available at run-time. Please remove from yaml file')
              raise Exception
         base_features = dict()
         col_indices = list()
@@ -824,7 +824,7 @@ class ind_encode(Transformer):
         try:
             assert len(touch_indices) > 0 #This check might be redundant with the one in the Transformer.fit() method
         except AssertionError:
-            print "Warning: " + self.manipulator_name + " is about touch 0 relevant columns."
+            print("Warning: " + self.manipulator_name + " is about touch 0 relevant columns.")
         self.touch_indices = touch_indices
         self.untouched_indices = untouched_indices
         assert len(touch_indices) == 1
@@ -988,7 +988,7 @@ class ind_drop_outliers(HorizontalTransformer):
             lower_thresh = desc.loc['25%'].values[0] - 1.5*IQR
         if pd.isnull(lower_thresh):
             X_sub = X_col
-            print "\t\t" + self.inclusion_patterns[0] + " drop outliers has an IQR = 0. No observations will be dropped"
+            print("\t\t" + self.inclusion_patterns[0] + " drop outliers has an IQR = 0. No observations will be dropped")
         else:
             X_sub = X_col[(X_col.iloc[:, 0] > lower_thresh) & (X_col.iloc[:, 0] < upper_thresh)]
         untouched_indices = list(X_sub.index)

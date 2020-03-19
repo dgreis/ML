@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from wrapper import Wrapper
-from common import DecisionTree
+from .wrapper import Wrapper
+from .common import DecisionTree
 from sklearn import ensemble
 from sklearn import tree
 from django.utils.text import slugify

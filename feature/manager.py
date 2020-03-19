@@ -26,7 +26,7 @@ class Manager:
         chain_plan = list()
         i = 0
         for m in manipulations:
-            manipulator_id = m.keys()[0]
+            manipulator_id = list(m.keys())[0]
             manipulator_class_name = manipulator_id.split('.')[-1:][0]
             if hasattr(engineering_module, manipulator_class_name):
                 manipulator_type = 'transformer'
@@ -127,7 +127,7 @@ class Manager:
         data_dir = find_data_dir(project_settings)
         data = dict()
 
-        if project_settings.has_key('take_nth_row'):
+        if 'take_nth_row' in project_settings:
             take_nth_row = project_settings['take_nth_row']
         else:
             take_nth_row = 1
@@ -148,7 +148,7 @@ class Manager:
         project_settings = self.project_settings
         manipulations = model_config['feature_settings']['manipulations']
         try:
-            first_manipulator_id = manipulations[0].keys()[0]
+            first_manipulator_id = list(manipulations[0].keys())[0]
             first_manipulator_instance = manipulations[0][first_manipulator_id]['initialized_manipulator']
             if issubclass(first_manipulator_instance.__class__, Cleaner):
                 has_cleaner = True
@@ -187,12 +187,12 @@ class Manager:
 
     def _find_last_cleaner(self, manipulations):
         i = 0
-        manipulator_id = manipulations[i].keys()[0]
+        manipulator_id = list(manipulations[i].keys())[0]
         manipulator_instance = manipulations[i][manipulator_id]['initialized_manipulator']
         while issubclass(manipulator_instance.__class__, Cleaner):
             i += 1
             try:
-                manipulator_id = manipulations[i].keys()[0]
+                manipulator_id = list(manipulations[i].keys())[0]
             except IndexError:
                 return i
             manipulator_instance = manipulations[i][manipulator_id]['initialized_manipulator']
@@ -205,7 +205,7 @@ class LeakEnforcer:
         has_peekers = False
         for i in range(len(manipulations_list)):
             manipulator_entry = manipulations_list[i]
-            manipulator_name = manipulator_entry.keys()[0]
+            manipulator_name = list(manipulator_entry.keys())[0]
             initialized_manipulator = manipulator_entry[manipulator_name]['initialized_manipulator']
             manipulator_peeking_status = initialized_manipulator.validation_peeking
             manipulator_map[manipulator_name] = { 'initialized_manipulator' : initialized_manipulator, #TODO: Why did I put initialized manipulator here?
@@ -219,7 +219,7 @@ class LeakEnforcer:
 
     def check_for_leak(self,X_mat):
         model_config = self.model_config
-        if model_config.has_key('folds_map'):
+        if 'folds_map' in model_config:
             manipulator_map = self.manipulator_map
             if len(manipulator_map) > 0:
                 initialized_manipulators = [item['initialized_manipulator'] for item in manipulator_map.values()]
@@ -244,7 +244,7 @@ class LeakEnforcer:
     def update_manipulations(self, updated_manipulations):
         manipulator_map = self.manipulator_map
         for manipulator_entry in updated_manipulations:
-            manipulator_id = manipulator_entry.keys()[0]
+            manipulator_id = list(manipulator_entry.keys())[0]
             initialized_manipulator = manipulator_entry[manipulator_id]['initialized_manipulator']
             manipulator_peeking_status = initialized_manipulator.validation_peeking
             if manipulator_id not in manipulator_map.keys():
@@ -261,7 +261,7 @@ class LeakEnforcer:
         manipulator_folds_map = dict()
         for i in range(len(initialized_manipulators)):
             initialized_manipulator = initialized_manipulators[0]
-            assert initialized_manipulator.model_config.has_key('folds_map')
+            assert 'folds_map' in initialized_manipulator.model_config
             manipulator_folds_map[i] = initialized_manipulator.model_config['folds_map']
         assert all(value == manipulator_folds_map[0] for value in manipulator_folds_map.values())
         #Above confirms that all manipulators have same CV fold information

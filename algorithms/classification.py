@@ -1,7 +1,7 @@
 
 from utils import flip_dict, load_inv_column_map
-from wrapper import Wrapper
-from common import DecisionTree
+from .wrapper import Wrapper
+from .common import DecisionTree
 from sklearn import tree
 
 class DecisionTreeClassifier(DecisionTree):

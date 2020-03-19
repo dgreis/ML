@@ -2,7 +2,7 @@ from scipy.stats import skew
 from utils import flip_dict
 
 from feature.engineering import Transformer
-from base_transformers import Identity
+from .base_transformers import Identity
 
 class Tagger(Transformer):
 

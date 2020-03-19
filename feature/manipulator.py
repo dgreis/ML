@@ -21,7 +21,7 @@ class Manipulator(object):
         self.features = None
         self.validation_peeking = False
         manipulations = model_config['feature_settings']['manipulations']
-        manipulator_names = [d.keys()[0] for d in manipulations]
+        manipulator_names = [list(d.keys())[0] for d in manipulations]
         manipulator_map = dict(zip(manipulator_names, range(len(manipulator_names))))
         self.manipulator_map = manipulator_map
         if not issubclass(self.__class__, ManipulatorChain):
@@ -47,7 +47,7 @@ class Manipulator(object):
         ord_man_map = flip_dict(manipulator_map)
         while counter > 0:
             cand_man_name = ord_man_map[counter - 1]
-            init_man = filter(lambda x: x.keys()[0] == cand_man_name, manipulations)[0][cand_man_name]['initialized_manipulator']
+            init_man = list(filter(lambda x: list(x.keys())[0] == cand_man_name, manipulations))[0][cand_man_name]['initialized_manipulator']
             if issubclass(init_man.__class__, getattr(tagger_module, 'Tagger')):
                 counter = counter - 1
             else:
@@ -70,7 +70,7 @@ class Manipulator(object):
         if self.features is None:
             raise Exception
         output_features_filepath = self._det_output_features_filepath(manipulator_name)
-        pd.Series(self.features).to_csv(output_features_filepath, index=False, sep='\t')
+        pd.Series(self.features).to_csv(output_features_filepath, index=False, header=False, sep='\t')
 
     def gen_new_column_names(self, touch_indices, prior_features):
         raise NotImplementedError
@@ -78,8 +78,8 @@ class Manipulator(object):
     def split(self, X_mat, y):
         untouched_indices = self.untouched_indices
         touch_indices = self.touch_indices
-        X_untouched = X_mat.loc[:,untouched_indices]
-        X_touch = X_mat.loc[:,touch_indices]
+        X_untouched = X_mat.loc[:,X_mat.columns.intersection(untouched_indices)]
+        X_touch = X_mat.loc[:,X_mat.columns.intersection(touch_indices)]
         return X_touch, X_untouched, y, None
 
     def reindex(self, prior_features, new_features=list()):
