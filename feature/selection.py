@@ -24,7 +24,7 @@ class FilterChain(ManipulatorChain):
         selection_module = importlib.import_module('feature.selection')
         initialized_filters = list()
         for entry in filter_list:
-            filter_id = entry.keys()[0]
+            filter_id = list(entry.keys())[0]
             filter_class = getattr(selection_module, filter_id) #TODO: This assumes filter_id's always mirror filter classes
             filter_instance = filter_class(filter_id, model_config, project_settings)
             entry[filter_id]['initialized_manipulator'] = filter_instance
@@ -43,7 +43,7 @@ class FilterChain(ManipulatorChain):
         else:
             for entry in filters:
                 #print "\t[" + dataset_name + "] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
-                filter_name = entry.keys()[0]
+                filter_name = list(entry.keys())[0]
                 filter_class = getattr(selection_module, filter_name)
                 fit_args = self._get_args(filter_class, 'fit')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], fit_args)
@@ -102,7 +102,7 @@ class FilterChain(ManipulatorChain):
 
     def _fetch_initialized_filter(self,entry):
         assert len(entry.keys()) == 1
-        key = entry.keys()[0]
+        key = list(entry.keys())[0]
         return entry[key]['initialized_manipulator']
 
 class Filter(Manipulator):
@@ -115,7 +115,7 @@ class Filter(Manipulator):
         model_config = self.model_config
         feature_selection_settings = model_config['feature_settings']['manipulations']
         for item in feature_selection_settings:
-            if item.keys()[0] == filter_name:
+            if list(item.keys())[0] == filter_name:
                 filter_settings = item[filter_name]
             else:
                 pass
@@ -127,7 +127,7 @@ class Filter(Manipulator):
         feature_names_filepath = self.prior_manipulator_feature_names_filepath
         inv_column_map = load_inv_column_map(feature_names_filepath)
         column_map = flip_dict(inv_column_map)
-        filtered_features = {k: v for k, v in column_map.iteritems() if k in untouched_indices}
+        filtered_features = {k: v for k, v in column_map.items() if k in untouched_indices}
         self.features = filtered_features
 
 class l1_based(Filter):

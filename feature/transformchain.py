@@ -140,7 +140,7 @@ class TransformChain(ManipulatorChain):
             prior_manipulator_offset = 0
         else:
             prior_manipulator_entry = existing_manipulations[t_idx - 1]
-            prior_manipulator_name = prior_manipulator_entry.keys()[0]
+            prior_manipulator_name = list(prior_manipulator_entry.keys())[0]
             prior_manipulator = prior_manipulator_entry[prior_manipulator_name]['initialized_manipulator']
             prior_manipulator_offset = prior_manipulator.manipulator_map[prior_manipulator_name] + 1
             if t_idx < len(existing_manipulations) - 1:
