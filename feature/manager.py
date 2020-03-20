@@ -31,7 +31,7 @@ class Manager:
             if hasattr(engineering_module, manipulator_class_name):
                 manipulator_type = 'transformer'
             elif hasattr(transformchain_module, manipulator_class_name):
-                manipulator_type = 'transformer'
+                manipulator_type = 'transformer_chain'
             elif hasattr(tagger_module, manipulator_class_name):
                 manipulator_type = 'transformer'
             elif hasattr(selection_module, manipulator_class_name):
@@ -40,9 +40,11 @@ class Manager:
                 raise Exception
             manipulator_map[i] = { 'manipulator_name' : manipulator_id, 'manipulator_type' : manipulator_type }
             if i == 0:
-                chain_plan.append((manipulator_type, 0))
+                chain_plan.append((manipulator_type.split('_')[0], 0))
+            elif 'chain' in manipulator_type:
+                chain_plan.append((manipulator_type.split('_')[0], i))
             elif chain_plan[-1][0] != manipulator_type:
-                chain_plan.append((manipulator_type, i))
+                chain_plan.append((manipulator_type.split('_')[0], i))
             i += 1
 
         len_chain = len(chain_plan)

@@ -327,8 +327,9 @@ class basis_expansion(Transformer):
 class ind_operator(Transformer):
 
     def __init__(self, transformer_id, model_config, project_settings):
-        super(ind_operator, self).__init__(transformer_id, model_config, project_settings)
         transformer_settings = self.fetch_transform_settings(model_config, transformer_id)
+        model_config = self.update_model_config(transformer_id, transformer_settings, model_config)
+        super(ind_operator, self).__init__(transformer_id, model_config, project_settings)
         equals = transformer_settings['equals']
         if 'keep_cols' in transformer_settings:
             keep_cols = transformer_settings['keep_cols']
