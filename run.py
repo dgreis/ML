@@ -66,6 +66,8 @@ def main():
         print("Validation dataset finalized. Training with " + str(len(X_train_p)) + " samples. Validation data with " +\
               str(len(X_val_p)) + " samples. Model with " + str(X_val_p.shape[1]) + " features. Now fitting model... ",end="")
         model = configure_algorithm(model_config, project_settings)
+        if model_config['dump_design']:
+            model.dump_design(X_train_p)
         model.fit(X_train_p, y_train_p)
         print('Model Fit.\nNext Step: Perform Model Evaluation')
         y_pred = model.predict(X_val_p)

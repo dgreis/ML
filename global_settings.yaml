@@ -8,6 +8,7 @@ model_facet_defaults:
         manipulations: []
     hyperparam_tuning_settings: None
     evaluate_testset: False
+    dump_design: False
 
 assessment:
   cv_num_folds: 5

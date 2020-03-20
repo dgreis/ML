@@ -42,6 +42,11 @@ class Wrapper(Manipulator):
         model_name = self.model_name
         pd.Series(y_pred).to_csv(artifact_dir + '/' + slugify(model_name) + '-validation-scores.txt',sep='\t',header=False,index=False)
 
+    def dump_design(self, data):
+        artifact_dir = self.artifact_dir
+        model_name = self.model_name
+        data.to_csv(artifact_dir + '/' + slugify(model_name) + '-design-matrix.txt', sep='\t', header=False, index=False)
+
     def set_features(self, working_features):
         setattr(self,'features', working_features)
 
