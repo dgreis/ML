@@ -1232,3 +1232,20 @@ class recode(Cleaner, Transformer):
         assert (fitted_indices == X_touch.columns).all()
         return super(recode, self).transform(X_touch, y_touch, **kwargs)
 
+class rename(Transformer):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(rename, self).__init__(transformer_id, model_config, project_settings)
+        transformer_settings = self.fetch_manipulator_settings(model_config)
+        inclusion_patterns = transformer_settings['inclusion_patterns']
+        targets = transformer_settings['targets']
+        assert len(targets) == len(inclusion_patterns)
+        self.target_mapping = dict(zip(inclusion_patterns,targets))
+        self.set_base_transformer(Identity(**self.kwargs))
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        target_mapping = self.target_mapping
+        orig_col_names = [prior_features[i] for i in touch_indices]
+        new_col_names = [target_mapping[n] for n in orig_col_names]
+        assert len(target_mapping) == len(orig_col_names) == len(new_col_names)
+        return new_col_names
