@@ -426,8 +426,9 @@ class ind_interaction_terms(basis_expansion):
         col_indices = list()
         for key in prior_features:
             base_feature = prior_features[key]
-            while ')' in base_feature:
-                base_feature = self.get_base_column_name(base_feature)
+            #Commented out below because I forgot which case required the original feature name
+            #while ')' in base_feature:
+            #    base_feature = self.get_base_column_name(base_feature)
             base_features[key] = base_feature
             col_indices = col_indices + [key]
         assert len(inclusion_patterns) == 2
@@ -435,8 +436,8 @@ class ind_interaction_terms(basis_expansion):
         len_t0_str = len(t0)
         len_t1_str = len(t1)
         base_feature_names = base_features.values()
-        t0_col_vals = filter(lambda x: (x[0:len_t0_str] == t0) and ('x%x' not in x), base_feature_names)
-        t1_col_vals = filter(lambda x: (x[0:len_t1_str] == t1) and ('x%x' not in x), base_feature_names)
+        t0_col_vals = list(filter(lambda x: (x[0:len_t0_str] == t0) and ('x%x' not in x), base_feature_names))
+        t1_col_vals = list(filter(lambda x: (x[0:len_t1_str] == t1) and ('x%x' not in x), base_feature_names))
         expanded_interactions = list(itertools.product(t0_col_vals, t1_col_vals))
         self.expanded_interactions = expanded_interactions
         relevant_base_cols = list(set([item for sublist in expanded_interactions for item in sublist])) #flattened list
