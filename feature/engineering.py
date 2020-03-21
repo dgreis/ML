@@ -14,7 +14,7 @@ from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
 from algorithms.algoutils import get_algo_class
 from sklearn.preprocessing import PolynomialFeatures
-from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import Normalizer, KBinsDiscretizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.decomposition import PCA
@@ -555,6 +555,20 @@ class standard_scale(Transformer):
             base_feature_name = working_features[idx]
             norm_feature_name = 'scaled(' + base_feature_name + ')'
             Xt_feat_names.append(norm_feature_name)
+        return Xt_feat_names
+
+class bin(Transformer):
+
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(bin, self).__init__(transformer_id, model_config, project_settings)
+        self.set_base_transformer(KBinsDiscretizer(encode='ordinal',**self.kwargs))
+
+    def gen_new_column_names(self, orig_tcol_idx, working_features):
+        Xt_feat_names = list()
+        for idx in orig_tcol_idx:
+            base_feature_name = working_features[idx]
+            bin_feature_name = 'bin(' + base_feature_name + ')'
+            Xt_feat_names.append(bin_feature_name)
         return Xt_feat_names
 
 class ind_box_cox_transform(Transformer):
