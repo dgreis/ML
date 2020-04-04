@@ -4,6 +4,8 @@ from .wrapper import Wrapper
 from .common import DecisionTree
 from sklearn import tree
 from sklearn import ensemble
+from sklearn import multiclass
+from sklearn import base
 from algorithms.algoutils import get_algo_class
 
 #TODO: Do I need this below? Or is it redundant?
@@ -35,10 +37,20 @@ class VotingClassifier(Wrapper):
         model_config['keyword_arg_settings']['estimators'] = estimators_final
         super(VotingClassifier, self).__init__(wrapper_id, base_algo_class, model_config, project_settings)
 
-# class Bagged_Classifier(Wrapper):
-#
-#     #TODO: Implement this. This is currently a placeholder
-#     def __init__(self, wrapper_id, base_algorithm_class, model_config='algorithm'):
-#         base_estimator_name = kwargs['estimator']
-#         base_estimator_class = None
-#         super(Bagged_Classifier, self).__init__(,
+class OutputCodeClassifier(Wrapper):
+    """Custom implementation of sklearn.multiclass.OutputCodeClassifier because component classifiers need
+    to be initialized first.
+
+    """
+    def __init__(self, wrapper_id, model_config, project_settings):
+        base_algo_class = multiclass.OutputCodeClassifier
+        estimator_raw = model_config['keyword_arg_settings']['estimator']
+        if base.is_classifier(estimator_raw):
+            estimator_final = estimator_raw
+        else:
+            est_algo_class = get_algo_class(estimator_raw['base_algorithm'])
+            est_algo_kwargs = estimator_raw['keyword_arg_settings']
+            est_algo_instance = est_algo_class(**est_algo_kwargs)
+            estimator_final = est_algo_instance
+        model_config['keyword_arg_settings']['estimator'] = estimator_final
+        super(OutputCodeClassifier, self).__init__(wrapper_id, base_algo_class, model_config, project_settings)

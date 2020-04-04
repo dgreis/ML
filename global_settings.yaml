@@ -66,5 +66,6 @@ metrics:
 
 
 overwritten_algos:  [
-                    'sklearn.ensemble._voting.VotingClassifier'
+                    'sklearn.ensemble._voting.VotingClassifier',
+                    'sklearn.multiclass.OutputCodeClassifier'
                     ]
