@@ -179,7 +179,10 @@ class Manager:
         chain_of_chains = self.chain_of_chains
         try:
             first_transform_chain = chain_of_chains[0]
-            old_transformations = first_transform_chain.transformations
+            #TODO: Take out this 'if' statement below if it functions well
+            if hasattr(first_transform_chain,'transformations'):
+                assert first_transform_chain.transformations == first_transform_chain.manipulations
+            old_transformations = first_transform_chain.manipulations
             new_transformations = old_transformations[max(i-1,0):]
             first_transform_chain.transformations = new_transformations
         except IndexError:

@@ -20,7 +20,7 @@ class CrossValidator:
             for param in hyper_params:
                 grid_template[param] = eval(hyper_params[param])
                 #TODO: This logic needs to be changed for new strategies, like random
-            self.grid = list(dict(zip(grid_template, x)) for x in itertools.product(*grid_template.itervalues()))
+            self.grid = list(dict(zip(grid_template, x)) for x in itertools.product(*grid_template.values()))
             self.hyperparam_eval_metric = model_config['hyperparam_tuning_settings']['eval_metric']
         else:
             self.tune_hyperparams = False
