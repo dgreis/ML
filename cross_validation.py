@@ -35,7 +35,7 @@ class CrossValidator:
         assert hasattr(self,'optimal_hyperparams')
         optimal_hyperparams = self.optimal_hyperparams
         for param in optimal_hyperparams:
-            setattr(model,param,optimal_hyperparams[param])
+            setattr(model.base_algorithm,param,optimal_hyperparams[param])
         return model
 
     def perform_cross_validation(self, data, model_config):

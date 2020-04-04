@@ -66,6 +66,8 @@ def main():
         print("Validation dataset finalized. Training with " + str(len(X_train_p)) + " samples. Validation data with " +\
               str(len(X_val_p)) + " samples. Model with " + str(X_val_p.shape[1]) + " features. Now fitting model... ",end="")
         model = configure_algorithm(model_config, project_settings)
+        if hasattr(cv,'optimal_hyperparams'):
+            model = cv.set_optimal_hyperparams(model)
         if model_config['dump_design']:
             model.dump_design(X_train_p)
         model.fit(X_train_p, y_train_p)
