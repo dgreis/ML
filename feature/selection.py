@@ -262,6 +262,8 @@ class mutual_information(Filter):
             - mutual_information:
                method: <str> i.e. 'regression or classif'
                keyword_arg_settings: {}
+                other_options:
+                    k: <int>
 
      """
 
@@ -270,15 +272,18 @@ class mutual_information(Filter):
         self.f_based_settings = self.fetch_filter_settings('mutual_information')
 
     def fit(self,X_mat,y):
-        f_based_settings = self.f_based_settings
-        method = f_based_settings['method']
+        me_based_settings = self.f_based_settings
+        method = me_based_settings['method']
         if method == "classif":
             me_model = mutual_info_classif
         elif method == 'regression':
             me_model = mutual_info_regression
         else:
             raise NotImplementedError
-        selector = SelectKBest(me_model).fit(X_mat, y)
+        other_options = me_based_settings['other_options']
+        k = other_options['k']
+        #selector = SelectKBest(me_model).fit(X_mat, y)
+        selector = SelectKBest(me_model, k=k).fit(X_mat, y)
         ir = pd.Series(selector.get_support())
         untouched_indices = ir[ir == True].index
         touch_indices = list(set(X_mat.columns).difference(set(untouched_indices)))
