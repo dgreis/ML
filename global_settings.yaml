@@ -64,3 +64,6 @@ metrics:
             kwargs: { "average" : "weighted" }
 
 
+overwritten_algos:  [
+                    'sklearn.ensemble._voting.VotingClassifier'
+                    ]
