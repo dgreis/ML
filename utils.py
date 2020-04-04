@@ -57,6 +57,12 @@ def set_default_configs_if_missing(model_configs, project_settings):
                 for sub_facet in default_feature_settings:
                     if not sub_facet in model_configs['Models'][model_name]['feature_settings']:
                         model_configs['Models'][model_name]['feature_settings'][sub_facet] = default_feature_settings[sub_facet]
+        for facet in model_configs['Models'][model_name]:
+            if facet not in project_settings['model_facet_defaults']:
+                print(facet + " in model " + model_name + " is not correctly specified. Check defaults in global_settings.yaml and try again.")
+                raise Exception
+            else:
+                pass
     return model_configs
 
 def all_clean_input_files_exist(project_settings):

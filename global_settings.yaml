@@ -2,6 +2,7 @@ repo_loc: "/Users/davidgreis/Documents/Personal/Data_Projects/ML"
 current_project: "forest_cover"
 
 model_facet_defaults:
+    base_algorithm: None
     keyword_arg_settings : {}
     other_options: {}
     feature_settings:
