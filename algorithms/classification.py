@@ -24,10 +24,7 @@ class VotingClassifier(Wrapper):
         if type(estimators_raw) == dict:
             estimators_final = list()
             for k in estimators_raw:
-                try:
-                    est_algo_class = get_algo_class(estimators_raw[k]['base_algorithm'])
-                except TypeError:
-                    assert 1 == 0
+                est_algo_class = get_algo_class(estimators_raw[k]['base_algorithm'])
                 est_algo_kwargs = estimators_raw[k]['keyword_arg_settings']
                 est_algo_instance = est_algo_class(**est_algo_kwargs)
                 estimators_final.append((k,est_algo_instance))
