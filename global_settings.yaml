@@ -64,7 +64,4 @@ metrics:
             kwargs: { "average" : "weighted" }
 
 
-overwritten_algos:  [
-                    'sklearn.ensemble._voting.VotingClassifier',
-                    'sklearn.multiclass.OutputCodeClassifier'
-                    ]
+overwritten_algos:  []

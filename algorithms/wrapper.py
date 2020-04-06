@@ -3,20 +3,58 @@ import pandas as pd
 import importlib
 
 from feature.manipulator import Manipulator
+from sklearn import base
 from django.utils.text import slugify
 from utils import load_clean_input_file_filepath, flip_dict
+from .algoutils import get_algo_class
 
 class Wrapper(Manipulator):
 
     def __init__(self, wrapper_id, base_algorithm_class, model_config, project_settings):
         kwargs = model_config['keyword_arg_settings']
         self.model_name = model_config['model_name']
+        if any(x in model_config['keyword_arg_settings'].keys() for x in ['estimator','estimators']):
+            model_config = self._initialize_estimators(model_config)
         self.base_algorithm = base_algorithm_class(**kwargs)
         if len(model_config['output']) > 0:
             self.gen_output_flag = True
         else:
             self.gen_output_flag = False
         super(Wrapper, self).__init__(wrapper_id, model_config, project_settings)
+
+    def _initialize_estimators(self, model_config):
+        key = list(filter(lambda x: 'estimator' in x, model_config['keyword_arg_settings'].keys()))[0]
+        if key == 'estimator':
+            model_config = self._handle_single_estimator(model_config)
+        else:
+            model_config = self._handle_multiple_estimators(model_config)
+        return model_config
+
+    def _handle_single_estimator(self, model_config):
+        estimator_raw = model_config['keyword_arg_settings']['estimator']
+        if base.is_classifier(estimator_raw):
+            return model_config
+        else:
+            est_algo_class = get_algo_class(estimator_raw['base_algorithm'])
+            est_algo_kwargs = estimator_raw['keyword_arg_settings']
+            est_algo_instance = est_algo_class(**est_algo_kwargs)
+            estimator_final = est_algo_instance
+            model_config['keyword_arg_settings']['estimator'] = estimator_final
+            return model_config
+
+    def _handle_multiple_estimators(self, model_config):
+        estimators_raw = model_config['keyword_arg_settings']['estimators']
+        if type(estimators_raw) == list:
+            return model_config
+        else:
+            estimators_final = list()
+            for k in estimators_raw:
+                est_algo_class = get_algo_class(estimators_raw[k]['base_algorithm'])
+                est_algo_kwargs = estimators_raw[k]['keyword_arg_settings']
+                est_algo_instance = est_algo_class(**est_algo_kwargs)
+                estimators_final.append((k, est_algo_instance))
+            model_config['keyword_arg_settings']['estimators'] = estimators_final
+            return model_config
 
     def fit(self,X,y):
         prior_features = self.load_prior_features()
