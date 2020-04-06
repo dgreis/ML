@@ -1,7 +1,5 @@
 import importlib
 
-from algorithms.wrapper import Wrapper
-
 def configure_algorithm(model_config, project_settings):
     base_algorithm = model_config['base_algorithm']
     base_algo_class = get_algo_class(base_algorithm)
@@ -9,6 +7,8 @@ def configure_algorithm(model_config, project_settings):
         print("Don't use original " + base_algorithm + " sklearn implementation. Check algorithms in package for custom package implementation instead")
         raise Exception
     if 'algorithms' not in base_algorithm:
+        wrapper_module = importlib.import_module('algorithms.wrapper')
+        Wrapper = getattr(wrapper_module, 'Wrapper')
         base_algo_instance = Wrapper('final_algorithm', base_algo_class, model_config, project_settings)  #Wrapper is used for algos implemented by others, i.e. sklearn
     else:
         base_algo_instance = base_algo_class('final_algorithm', model_config, project_settings)
