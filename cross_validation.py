@@ -58,6 +58,11 @@ class CrossValidator:
         for setting in grid:
             if grid != ['default']:
                 for param in setting:
+                    try:
+                        assert hasattr(model.base_algorithm,param)
+                    except AssertionError:
+                        print("The hyperparameter " + param + " was not specified correctly. Check and try again")
+                        raise Exception
                     setattr(model.base_algorithm,param,setting[param])
             setting_name = str(setting)
             print("\ttuning hyperparam for setting: " + setting_name + " (" + str(i) +'/' + str(num_settings) + ")")
