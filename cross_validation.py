@@ -25,7 +25,7 @@ class CrossValidator:
         else:
             self.tune_hyperparams = False
             self.grid = ['default']
-        self.cv_num_folds = project_settings['assessment']['cv_num_folds']
+        self.cv_num_folds = model_config['cv_num_folds']
         self.evaluation_battery = load_evaluation_battery(project_settings)
         self.report_entries = dict()
         self.project_settings = project_settings

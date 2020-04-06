@@ -37,7 +37,7 @@ def main():
         manager = Manager(model_config,project_settings)
         data = manager.load_clean_datasets('train_val',project_settings)
         cv = CrossValidator(model_config, project_settings)
-        cv_num_folds = det_num_cv_folds(model_config, project_settings)
+        cv_num_folds = det_num_cv_folds(model_config)
         if cv_num_folds > 1:
             print("Next Step: estimate generalization error for some metrics using CV")
             entries = cv.perform_cross_validation(data, model_config)
