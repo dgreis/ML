@@ -369,3 +369,14 @@ class ExpressionEvaluator:
         else:
             X_touched = eval(fully_qualified_expression)
         return X_touched
+
+class Converter:
+
+    def __init__(self):
+        pass
+
+    def fit(self, X, y):
+        pass
+
+    def transform(self, X, y):
+        return np.array(X), np.array(y)

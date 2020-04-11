@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 from feature.base_transformers import InvOneHotEncoder, Interpolator, LeaveOneOutEncoder, Deleter, Identity, \
-    Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer, Recoder, ExpressionEvaluator
+    Sampler, Stacker, OOSPredictorEns, MetaModeler, Imputer, Recoder, ExpressionEvaluator, Converter
 from .manipulator import ManipulatorChain, Manipulator
 from algorithms.wrapper import Wrapper
 from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
@@ -1249,3 +1249,29 @@ class rename(Transformer):
         new_col_names = [target_mapping[n] for n in orig_col_names]
         assert len(target_mapping) == len(orig_col_names) == len(new_col_names)
         return new_col_names
+
+class convert_to_numpy(Transformer):
+
+    """
+    Models:
+      <model name>
+        base_algorithm: <algorithm>
+          feature_settings:
+            manipulations:
+              - convert_to_numpy:
+                  inclusion_patterns: ['All']
+    """
+    def __init__(self, transformer_id, model_config, project_settings):
+        super(convert_to_numpy, self).__init__(transformer_id, model_config, project_settings)
+        self.set_base_transformer(Converter(**self.kwargs))
+
+    def gen_new_column_names(self, touch_indices, prior_features):
+        return prior_features
+
+    def transform(self, X_touch, y_touch, **kwargs):
+        return self.base_transformer.transform(X_touch,y_touch)
+
+    def combine(self,X_touched,X_untouched,y_touched,y_untouched):
+        features = self.features
+        assert len(features) == X_touched.shape[1]
+        return X_touched, y_touched

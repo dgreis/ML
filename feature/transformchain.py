@@ -4,6 +4,7 @@ import time
 import re
 
 import pandas as pd
+import numpy as np
 
 from feature.engineering import Cleaner, HorizontalTransformer
 from feature.manipulator import ManipulatorChain, Manipulator
@@ -96,6 +97,7 @@ class TransformChain(ManipulatorChain):
                 tfkwargs = dict()
                 for arg in additional_args:
                    tfkwargs[arg] = eval(arg)
+                #TODO: Write a less confusing routing logic for transformers
                 X_touched, y_touched = transformer.transform(X_touch, y_touch,**tfkwargs)
                 combine_args = self._get_args(transformer_class, 'combine')
                 additional_args = filter(lambda x: x not in ['X_touched','X_untouched','y_touched','y_untouched'],combine_args)
@@ -110,7 +112,7 @@ class TransformChain(ManipulatorChain):
                 X_mat, y = X_transform, y_transform
                 i += 1
             try:
-                assert True not in pd.isnull(X_transform).any(1).value_counts()  # TODO: pandas dependent
+                self._assert_no_nulls(X_transform)
             except AssertionError:
                 features = transformer.features
                 nis = pd.isnull(X_transform).any(0)[pd.isnull(X_transform).any(0)].index
@@ -124,6 +126,23 @@ class TransformChain(ManipulatorChain):
                 #TODO: Figure out more helpful Exceptions. Till then, time.sleep above makes it a bit more readable
                 raise Exception
         return X_transform, y_transform
+
+    def _assert_no_nulls(self,X_transform):
+        if type(X_transform) == pd.DataFrame:
+            try:
+                assert True not in pd.isnull(X_transform).any(1).value_counts()
+                return True
+            except AssertionError:
+                return False
+        elif type(X_transform) == np.ndarray:
+            try:
+                assert True not in pd.isnull(X_transform).any(1)
+                return True
+            except AssertionError:
+                return False
+        else:
+            raise Exception("Data is not in recognized format")
+
 
     def fit_transform(self,X_mat,y,dataset_name):
         return self.transform(X_mat,y,dataset_name,fit_transform=True)
