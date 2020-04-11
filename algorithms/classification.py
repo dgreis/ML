@@ -1,9 +1,10 @@
 import pandas as pd
 import math
+import skorch
 
 from utils import flip_dict, load_inv_column_map
 from .wrapper import Wrapper
-from .common import DecisionTree
+from .common import DecisionTree, NeuralNetwork
 from django.utils.text import slugify
 from sklearn import tree
 from sklearn import ensemble
@@ -71,3 +72,9 @@ class AugGradientBoostingClassifier(Wrapper):
         df.to_csv(artifact_dir +'/' + slugify(model_name) + '-interaction-strengths.txt'
                   ,header=False
                   )
+
+class NeuralNetworkClassifier(NeuralNetwork):
+
+    def __init__(self, wrapper_id, model_config, project_settings):
+        base_algorithm_class = skorch.NeuralNetClassifier
+        super(NeuralNetworkClassifier,self).__init__(wrapper_id, base_algorithm_class, model_config, project_settings)

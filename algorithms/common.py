@@ -9,6 +9,8 @@ from utils import flip_dict, load_inv_column_map
 from django.utils.text import slugify
 from collections import OrderedDict
 from sklearn import tree
+from torch import nn
+import torch.nn.functional as F
 
 
 class DecisionTree(Wrapper):
@@ -97,3 +99,59 @@ class PassThrough:
     def predict(self,X):
         assert X.shape[1] == 1
         return np.array(X[0])
+
+class NeuralNetwork(Wrapper):
+
+    def __init__(self, wrapper_id, base_algorithm_class, model_config, project_settings):
+        custom_network_module = self._assemble_network(model_config)
+        model_config['keyword_arg_settings']['module'] = custom_network_module
+        super(NeuralNetwork, self).__init__(wrapper_id, base_algorithm_class, model_config, project_settings)
+
+    def _assemble_network(self, model_config):
+        network_layers = model_config['network']['layers']
+        network_settings = {k: v for k, v in model_config['network'].items() if 'layers' not in k}
+        module = type('util',(TestShell,),{'__doc__': ' utility class to create pytorch nn'})
+        step_dict = dict()
+        i = 0
+        for layer in network_layers:
+            if type(layer) == dict:
+                layer_class_name = list(layer.keys())[0]
+                init_kwargs = layer[layer_class_name]
+                final_kwargs = dict()
+                for k in init_kwargs:
+                    if init_kwargs[k] in network_settings:
+                        final_kwargs[k] = network_settings[init_kwargs[k]]
+                    else:
+                        final_kwargs[k] = init_kwargs[k]
+                kwargs = final_kwargs
+            else:
+                layer_class_name = layer
+                kwargs = {}
+            torch_submodule,torch_object = layer_class_name.split('.')
+            if torch_submodule == 'F':
+                torch_module = importlib.import_module('torch.nn.functional')
+                torch_method = getattr(torch_module, torch_object)
+                step_dict[i] = torch_method
+            else:
+                torch_module = importlib.import_module('torch.nn')
+                torch_class = getattr(torch_module, torch_object)
+                step_dict[i] = torch_class(**kwargs)
+            i += 1
+        setattr(module,'step_dict',step_dict)
+        return module
+
+
+class TestShell(nn.Module):
+
+    def __init__(self, **kwargs):
+        super(TestShell, self).__init__()
+        step_dict = self.step_dict
+        for i in step_dict:
+            setattr(self,'step' + str(i), step_dict[i])
+
+    def forward(self, X, **kwargs):
+        X = self.step1(self.step0(X.float()))
+        X = self.step2(X)
+        X = F.relu(self.step3(X))
+        X = F.softmax(self.step4(X))
+        return X

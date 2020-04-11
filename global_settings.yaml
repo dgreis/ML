@@ -3,6 +3,7 @@ current_project: "forest_cover"
 
 model_facet_defaults:
     base_algorithm: None
+    network: None
     keyword_arg_settings : {}
     feature_settings:
         manipulations: []
