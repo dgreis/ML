@@ -1,5 +1,5 @@
 from utils import *
-import yaml
+from ruamel.yaml import YAML
 import boto3
 
 def handle_remote(project_settings):
@@ -11,6 +11,10 @@ def handle_remote(project_settings):
     current_project = global_settings['current_project']
     write_remote_global_settings_file(project_settings)
     files_to_export.append('./remote/global_settings.yaml')
+
+    #Other essential files:
+    files_to_export.append('./projects/' + current_project + '/src/project_settings.yaml')
+    files_to_export.append('./projects/' + current_project + '/src/models.yaml')
 
     for f in files_to_export:
         send_file_to_s3(bucket_name, current_project, f)
@@ -48,11 +52,12 @@ def check_for_missing_files(bucket_name, project_settings):
     return files_to_upload
 
 def write_remote_global_settings_file(project_settings):
+    yaml = YAML(typ='safe')
+    yaml.preserve_quotes = True
+    yaml.boolean_representation = ['False', 'True']
     with open('./global_settings.yaml') as f:
-        doc = yaml.load(f, Loader=yaml.FullLoader)
-
-        # doc['repo_loc'] = '/home/ubuntu/ML/'
+        doc = yaml.load(f)
         doc['repo_loc'] = project_settings['remote_settings']['remote_repo_loc']
-        doc['remote_settings']['remote_deploy'] = 'False'
+        doc['remote_settings']['remote_deploy'] = False
     with open('./remote/global_settings.yaml', 'w') as f:
-        yaml.safe_dump(doc, f)
+        yaml.dump(doc, f)
