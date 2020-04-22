@@ -1,6 +1,9 @@
 repo_loc: "/Users/davidgreis/Documents/Personal/Data_Projects/ML"
 current_project: "forest_cover"
-
+remote_settings:
+  remote_deploy: False
+  remote_repo_loc: '/ML/'
+  s3_bucket: 'remote-ml-greis-test'
 model_facet_defaults:
     base_algorithm: None
     network: None
