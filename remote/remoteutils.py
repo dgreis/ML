@@ -1,6 +1,7 @@
 from utils import *
 from ruamel.yaml import YAML
 import boto3
+import docker
 
 def handle_remote(project_settings):
     bucket_name = project_settings['remote_settings']['s3_bucket']
@@ -18,7 +19,28 @@ def handle_remote(project_settings):
 
     for f in files_to_export:
         send_file_to_s3(bucket_name, current_project, f)
+
     # 2. TODO: Deploy instance
+    dc = docker.from_env()
+    active_containers = dc.containers.list()
+    if len(active_containers) > 0:
+        c = active_containers[0]
+    else:
+        c = dc.containers.run('ssh_test_image:latest',
+                          environment={
+                              'CURRENT_PROJECT': project_settings['current_project'],
+                              'S3_BUCKET': project_settings['remote_settings']['s3_bucket'],
+                              'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
+                          },
+                          detach=True)
+    cmds = ["/bin/sh", "-c", 'cd $REPO_LOC && bash startup.sh']
+    apic = docker.APIClient()
+    exe = apic.exec_create(container=c.id, cmd=cmds)
+    exe_start = apic.exec_start(exec_id=exe, stream=True)
+    for val in exe_start:
+        print(val.strip())
+    assert 1 == 0
+
 
 def send_file_to_s3(bucket_name, current_project, f):
     file_name = f.split('/')[-1]

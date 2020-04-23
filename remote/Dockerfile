@@ -49,11 +49,7 @@ COPY ./startup.sh /ML/
 #COPY ./run.py /ML/
 #RUN python3 -m pip install /git_repo
 #RUN python3 git_repo/setup.py install
-#TODO: Find a way to set these programmatically
-ENV CURRENT_PROJECT='forest_cover'
-ENV S3_BUCKET='remote-ml-greis-test'
 ENV AWS_CONFIG_FILE='~/.aws/config'
-ENV REPO_LOC='/ML'
 
 # Cleanup
 RUN apt-get update && apt-get upgrade -y && apt-get autoremove -y
