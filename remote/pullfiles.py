@@ -4,19 +4,13 @@ import os
 
 
 def main():
-    #TODO: Find fix for hardcoding below
-    global_settings = yaml.safe_load(open('./ML/global_settings.yaml'))
-    credentials = yaml.safe_load(open('./ML/remote/credentials.yaml'))
+    current_dir = os.getcwd()
+    global_settings = yaml.safe_load(open(current_dir + '/global_settings.yaml'))
 
     repo_loc = global_settings['repo_loc']
 
-    s3 = boto3.client('s3',
-         aws_access_key_id=credentials['ACCESS_ID'],
-         aws_secret_access_key= credentials['ACCESS_KEY'])
-
-    s3r = boto3.resource('s3',
-         aws_access_key_id=credentials['ACCESS_ID'],
-         aws_secret_access_key= credentials['ACCESS_KEY'])
+    s3 = boto3.client('s3')
+    s3r = boto3.resource('s3')
 
     bucket_name = global_settings['remote_settings']['s3_bucket']
     bucket = s3r.Bucket(bucket_name)

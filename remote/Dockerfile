@@ -17,6 +17,7 @@ RUN /etc/init.d/ssh restart
 
 # Install git, so we can pull in some repos
 RUN apt-get update && apt-get upgrade -y && apt-get install -y git
+RUN apt-get install -y awscli
 
 # SSH login fix. Otherwise user is kicked off after login
 RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
@@ -40,20 +41,22 @@ ARG CACHE_DATE=2020-04-22
 #TODO: Delete this token so it's not hardcoded and bring it in programmatically somehow
 RUN git clone -b skorch-nn https://dgreis:42d71e99b8b9917f248a85aeabe95883d653a097@github.com/dgreis/ML.git
 
-#TODO: following line needs to happen somewhere so pullfile doesn't need to think which global_settings it is using.
-COPY ./global_settings.yaml /ML/
 
 #TODO: These are here now so I don't have to push to git
 COPY ./pullfiles.py /ML/remote/
-COPY ./credentials.yaml /ML/remote/
+COPY ./.aws /root/.aws/
+COPY ./startup.sh /ML/
 #COPY ./run.py /ML/
 #RUN python3 -m pip install /git_repo
 #RUN python3 git_repo/setup.py install
+#TODO: Find a way to set these programmatically
+ENV CURRENT_PROJECT='forest_cover'
+ENV S3_BUCKET='remote-ml-greis-test'
+ENV AWS_CONFIG_FILE='~/.aws/config'
+ENV REPO_LOC='/ML'
 
 # Cleanup
 RUN apt-get update && apt-get upgrade -y && apt-get autoremove -y
-
-RUN python ./ML/remote/pullfiles.py
 
 EXPOSE 22
 CMD ["/usr/sbin/sshd", "-D"]
