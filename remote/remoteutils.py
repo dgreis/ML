@@ -1,6 +1,8 @@
 from utils import *
 from ruamel.yaml import YAML
 import boto3
+import os
+import tarfile
 import docker
 
 def handle_remote(project_settings):
@@ -33,13 +35,29 @@ def handle_remote(project_settings):
                               'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
                           },
                           detach=True)
+
+    #Add AWS credentials
+    working_dir = os.getcwd()
+    src = os.path.expanduser('~') + '/.aws'
+    os.chdir(os.path.dirname(src))
+    dst = '/root/'
+    srcname = os.path.basename(src)
+    tar = tarfile.open('./test' + '.tar', mode='w')
+    try:
+        tar.add(srcname)
+    finally:
+        tar.close()
+
+    data = open('./test' + '.tar', 'rb').read()
+    c.put_archive(dst, data)
+    os.chdir(working_dir)
+
     cmds = ["/bin/sh", "-c", 'cd $REPO_LOC && bash startup.sh']
     apic = docker.APIClient()
     exe = apic.exec_create(container=c.id, cmd=cmds)
     exe_start = apic.exec_start(exec_id=exe, stream=True)
     for val in exe_start:
         print(val.strip())
-    assert 1 == 0
 
 
 def send_file_to_s3(bucket_name, current_project, f):

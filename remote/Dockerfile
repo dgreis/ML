@@ -44,7 +44,6 @@ RUN git clone -b skorch-nn https://dgreis:42d71e99b8b9917f248a85aeabe95883d653a0
 
 #TODO: These are here now so I don't have to push to git
 COPY ./pullfiles.py /ML/remote/
-COPY ./.aws /root/.aws/
 COPY ./startup.sh /ML/
 #COPY ./run.py /ML/
 #RUN python3 -m pip install /git_repo
