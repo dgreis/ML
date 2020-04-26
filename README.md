@@ -31,7 +31,7 @@ The program expects the following structure from any given project:
  ```
  _NOTE:_ Be sure to change the `repo_loc` in `global_settings.yaml` to the location of the git repository on your machine. 
  
- - `prep_data.py`: This is a file you write to do any custom pre-processing. It should generate all the files in the `processed` folder. The program will check for these files when it runs; if it doesn't find them, it will run `prep.py`.
+ - `prep_data.py`: This is a file you write to do any custom pre-processing. It should generate all the files in the `processed` folder. The program will check for these files when it runs; if it doesn't find them, it will run `prep_data.py`.
  
  - `project_settings.yaml`: see `house_prices/src/project_settings.yaml` as a model. This file holds several project-specific parameters/
  
