@@ -2,7 +2,7 @@
 
 My personal ML sandbox. Goal: to rapidly prototype POC sk-learn models from simple, modular yaml files. To get started, create a uniquely-named project sub-directory in the `projects` folder. 
 
-####Current Dev Branches:
+#### Current Dev Branches:
 
 - Add pytorch/keras model support
 - AWS EC2 model training using docker
@@ -37,7 +37,7 @@ The program expects the following structure from any given project:
  
  - `models.yaml`: this is where most of the funcionality is driven. Again, see `house_prices/src/models.yaml` as an example. 
  
- All of the feature engineering/selection components that have been implemented are in the `./feature/selection.py`, `./feature/engineering.py`, and `feature/transformchain.py` files. In the class definitions are usage examples within a `models.yaml` file.
+ All of the feature engineering/selection components that have been implemented are in the `./feature/selection.py`, `./feature/engineering.py`, and `feature/transformchain.py` files. In the class definitions are examples of usage within a `models.yaml` file.
  
  
 
