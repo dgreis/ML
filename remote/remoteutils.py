@@ -4,6 +4,11 @@ import boto3
 import os
 import tarfile
 import docker
+import time
+import paramiko
+from subprocess import Popen,PIPE
+
+credentials = yaml.safe_load(open('./remote/credentials.yaml'))
 
 def handle_remote(project_settings):
     bucket_name = project_settings['remote_settings']['s3_bucket']
@@ -22,19 +27,101 @@ def handle_remote(project_settings):
     for f in files_to_export:
         send_file_to_s3(bucket_name, current_project, f)
 
-    # 2. TODO: Deploy instance
-    dc = docker.from_env()
+    #2.0 spawn ec2 instance
+    ec2 = boto3.resource('ec2', region_name='eu-west-1')
+    instances_init = list(ec2.instances.filter(
+        Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))
+    if len(instances_init) > 0:
+        pass
+        #TODO: write logic
+    else:
+        ec2.create_instances(ImageId='ami-0f2ed58082cb08a4d'
+                             ,MinCount=1, MaxCount=1
+                             ,InstanceType='t2.large'
+                             ,KeyName='remote-ml'
+                             ,SecurityGroups=['remote-ml-sg']
+                             ,BlockDeviceMappings=[
+                                {'Ebs': {'VolumeSize': 16},
+                                 'DeviceName': '/dev/sda1'
+                                }])
+        time.sleep(60)
+    instance = list(ec2.instances.filter(
+        Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))[0]
+
+    #Connect to SSH Client
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    privkey = paramiko.RSAKey.from_private_key_file('./remote/remote-ml.pem')
+    print("connecting")
+    ssh.connect(instance.public_dns_name,username='ubuntu',pkey=privkey)
+    print("connected")
+
+    #Uploading essential files from local
+    sftp = ssh.open_sftp()
+    if not exists_remote(sftp, '/home/ubuntu/.aws'):
+        ssh.exec_command('mkdir -p /home/ubuntu/.aws')
+    for file in ['config','credentials']:
+        sftp.put( os.path.expanduser('~') + '/.aws/' + file, '/home/ubuntu/.aws/' + file)
+    sftp.put('./remote/ec2bootup.sh','/home/ubuntu/ec2bootup.sh')
+    sftp.close()
+
+    #Running SSH Commands
+    stdin, stdout, stderr = ssh.exec_command('bash ec2bootup.sh')
+    #stdin, stdout, stderr = ssh.exec_command('curl -fsSL https://get.docker.com -o get-docker.sh')
+    #stdin, stdout, stderr = ssh.exec_command('sudo sh get-docker.sh')
+
+    #Docker port forwarding
+    bashCommand = "ssh -i ./remote/remote-ml.pem  -N -L 2375:/var/run/docker.sock ubuntu@" + instance.public_dns_name
+    #process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
+    forwarding_process = Popen(bashCommand.split(), stdout=PIPE)
+    print('spawned forwarding process, id: ' + str(forwarding_process.pid))
+    #output, error = process.communicate()
+    #os.environ["DOCKER_HOST"] = "tcp://localhost:2375"
+
+    # assert 1 == 0
+
+    # #stdin.flush()
+    # data = stdout.read().splitlines()
+    # err = stderr.read().splitlines()
+    # for line in err:
+    #     x = line.decode()
+    #     #print(line.decode())
+    #     print(x)
+    # ssh.close()
+    # assert 1 == 0
+    # 2.1 create docker and run script
+
+
+    #apic = docker.APIClient()
+    apic = docker.APIClient(base_url='tcp://localhost:2375')
+    dc = docker.from_env(environment={'DOCKER_HOST': 'tcp://localhost:2375'})
     active_containers = dc.containers.list()
     if len(active_containers) > 0:
         c = active_containers[0]
     else:
-        c = dc.containers.run('ssh_test_image:latest',
+        # resp = dc.login(username=credentials['DOCKER_USERNAME'],
+        #          password=credentials['DOCKER_PASSWORD']
+        #         )
+        progress = apic.pull('dgreis/ml', 'latest', stream=True,
+                  auth_config={'username': credentials['DOCKER_USERNAME']
+                             , 'password': credentials['DOCKER_PASSWORD']})
+        for val in progress:
+            print(val.strip())
+        #dc.images.pull('dgreis/ml','latest')
+        #dc = docker.from_env()
+        c = dc.containers.run('dgreis/ml:latest',
                           environment={
                               'CURRENT_PROJECT': project_settings['current_project'],
                               'S3_BUCKET': project_settings['remote_settings']['s3_bucket'],
                               'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
                           },
                           detach=True)
+        # c = apic.create_container('dgreis/ml:latest',
+        #                           environment={
+        #                             'CURRENT_PROJECT': project_settings['current_project'],
+        #                             'S3_BUCKET': project_settings['remote_settings']['s3_bucket'],
+        #                             'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
+        #                             })
 
     #Add AWS credentials
     working_dir = os.getcwd()
@@ -53,11 +140,18 @@ def handle_remote(project_settings):
     os.chdir(working_dir)
 
     cmds = ["/bin/sh", "-c", 'cd $REPO_LOC && bash startup.sh']
-    apic = docker.APIClient()
     exe = apic.exec_create(container=c.id, cmd=cmds)
     exe_start = apic.exec_start(exec_id=exe, stream=True)
     for val in exe_start:
         print(val.strip())
+
+def exists_remote(sftp_client, path):
+    try:
+        sftp_client.stat(path)
+    except FileNotFoundError:
+        return False
+    else:
+        return True
 
 
 def send_file_to_s3(bucket_name, current_project, f):
