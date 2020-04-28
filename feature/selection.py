@@ -3,7 +3,7 @@ import importlib
 import copy
 
 from .manipulator import ManipulatorChain, Manipulator
-from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath
+from utils import flip_dict, load_inv_column_map, load_clean_input_file_filepath, get_args
 from algorithms.classification import DecisionTreeClassifier
 from algorithms.regression import DecisionTreeRegressor
 from algorithms.common import DecisionTree
@@ -46,7 +46,7 @@ class FilterChain(ManipulatorChain):
                 #print "\t[" + dataset_name + "] Performing model selection (" + str(i) + '/' + str(len(filters)) + "): " + filter_name
                 filter_name = list(entry.keys())[0]
                 filter_class = getattr(selection_module, filter_name)
-                fit_args = self._get_args(filter_class, 'fit')
+                fit_args = get_args(filter_class, 'fit')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], fit_args)
                 kwargs = dict()
                 for arg in additional_args:

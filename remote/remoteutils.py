@@ -1,144 +1,7 @@
 from utils import *
 from ruamel.yaml import YAML
 import boto3
-import os
-import tarfile
-import docker
-import time
-import paramiko
-from subprocess import Popen,PIPE
-
-credentials = yaml.safe_load(open('./remote/credentials.yaml'))
-
-def handle_remote(project_settings):
-
-    print("Program running in remote mode")
-    bucket_name = project_settings['remote_settings']['s3_bucket']
-    files_to_export = check_for_missing_files(bucket_name, project_settings)
-
-    # 1.1 Export global settings file
-    global_settings = yaml.safe_load(open('./global_settings.yaml'))
-    current_project = global_settings['current_project']
-    write_remote_global_settings_file(project_settings)
-    files_to_export.append('./remote/global_settings.yaml')
-
-    #Other essential files:
-    files_to_export.append('./projects/' + current_project + '/src/project_settings.yaml')
-    files_to_export.append('./projects/' + current_project + '/src/models.yaml')
-
-    for f in files_to_export:
-        send_file_to_s3(bucket_name, current_project, f)
-
-    #2.0 spawn ec2 instance
-    ec2 = boto3.resource('ec2', region_name='eu-west-1')
-    instances_init = list(ec2.instances.filter(
-        Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))
-    print("Checking AWS for instances that are already running")
-    if len(instances_init) > 0:
-        pass
-        #TODO: write logic
-    else:
-        print("No running instance found. Spawning a new instance instead")
-        ec2.create_instances(ImageId='ami-0f2ed58082cb08a4d'
-                             ,MinCount=1, MaxCount=1
-                             ,InstanceType='t2.large'
-                             ,KeyName='remote-ml'
-                             ,SecurityGroups=['remote-ml-sg']
-                             ,BlockDeviceMappings=[
-                                {'Ebs': {'VolumeSize': 16},
-                                 'DeviceName': '/dev/sda1'
-                                }])
-        init_time = 30
-        print("Sleep " + str(init_time) + " seconds while instance initiates")
-        time.sleep(init_time)
-        print("Sleep time over; get to work!")
-    instance = list(ec2.instances.filter(
-        Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))[0]
-
-    #Connect to SSH Client
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    privkey = paramiko.RSAKey.from_private_key_file('./remote/remote-ml.pem')
-    print("connecting")
-    ssh.connect(instance.public_dns_name,username='ubuntu',pkey=privkey)
-    print("connected")
-
-    #Uploading essential files from local
-    sftp = ssh.open_sftp()
-    if not exists_remote(sftp, '/home/ubuntu/.aws'):
-        ssh.exec_command('mkdir -p /home/ubuntu/.aws')
-    for file in ['config','credentials']:
-        sftp.put( os.path.expanduser('~') + '/.aws/' + file, '/home/ubuntu/.aws/' + file)
-    sftp.put('./remote/ec2bootup.sh','/home/ubuntu/ec2bootup.sh')
-    sftp.close()
-    print("Essential credentials and ec2 boot-up scripts added via SFTP")
-
-    #Running SSH Commands
-    stdin, stdout, stderr = ssh.exec_command('bash ec2bootup.sh')
-
-    #Docker port forwarding
-    bashCommand = "ssh -o StrictHostKeyChecking=no -i ./remote/remote-ml.pem  -N -L 2375:/var/run/docker.sock ubuntu@" + instance.public_dns_name
-    forwarding_process = Popen(bashCommand.split(), stdout=PIPE)
-    print('Begin local port forwarding so this computer can run remote docker server. Spawned forwarding process, id: ' + str(forwarding_process.pid))
-    time.sleep(5)
-
-    apic = docker.APIClient(base_url='tcp://localhost:2375')
-    Err = True
-    Max_tries = 5
-    i = 0
-    interval = 10
-    print("Attempt Max: " + str(Max_tries) + " times to establish tunnel docker client")
-    while Err and i <= Max_tries:
-        try:
-            dc = docker.from_env(environment={'DOCKER_HOST': 'tcp://localhost:2375'})
-            active_containers = dc.containers.list()
-            Err = False
-        except Exception:
-            print("Attempt #" + str(i) + " to instantiate tunnel docker client failed. Try again in "+ str(interval) +  " seconds")
-            time.sleep(10)
-            i += 1
-    print("Client connection established after " + str(i) + "attempts. Now checking for active docker containers")
-    if len(active_containers) > 0:
-        c = active_containers[0]
-    else:
-        print("No active containers found.")
-        progress = apic.pull('dgreis/ml', 'latest', stream=True,
-                  auth_config={'username': credentials['DOCKER_USERNAME']
-                             , 'password': credentials['DOCKER_PASSWORD']})
-        for val in progress:
-            print(val.strip())
-        print("Start new docker container")
-        c = dc.containers.run('dgreis/ml:latest',
-                          environment={
-                              'CURRENT_PROJECT': project_settings['current_project'],
-                              'S3_BUCKET': project_settings['remote_settings']['s3_bucket'],
-                              'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
-                          },
-                          detach=True)
-
-    #Add AWS credentials
-    working_dir = os.getcwd()
-    src = os.path.expanduser('~') + '/.aws'
-    os.chdir(os.path.dirname(src))
-    dst = '/root/'
-    srcname = os.path.basename(src)
-    tar = tarfile.open('./test' + '.tar', mode='w')
-    try:
-        tar.add(srcname)
-    finally:
-        tar.close()
-
-    data = open('./test' + '.tar', 'rb').read()
-    c.put_archive(dst, data)
-    os.chdir(working_dir)
-    print("credentials loaded into docker container. Now run program")
-
-    cmds = ["/bin/sh", "-c", 'cd $REPO_LOC && bash startup.sh']
-    exe = apic.exec_create(container=c.id, cmd=cmds)
-    exe_start = apic.exec_start(exec_id=exe, stream=True)
-    for val in exe_start:
-        print(val.strip())
-    forwarding_process.kill()
+import importlib
 
 def exists_remote(sftp_client, path):
     try:
@@ -148,6 +11,11 @@ def exists_remote(sftp_client, path):
     else:
         return True
 
+def get_environment(env_mode_abbrev):
+    env_module = importlib.import_module('remote.environment')
+    env_class_name= env_mode_abbrev + 'Env'
+    env_class = getattr(env_module, env_class_name)
+    return env_class
 
 def send_file_to_s3(bucket_name, current_project, f):
     file_name = f.split('/')[-1]

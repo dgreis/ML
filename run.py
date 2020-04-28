@@ -25,8 +25,8 @@ def main():
 
     model_configs = load_model_configs(project_settings)['Models']
     if project_settings['remote_settings']['remote_deploy']:
-        remote_module = importlib.import_module('remote.remoteutils')
-        remote_module.handle_remote(project_settings)
+        remote_module = importlib.import_module('remote.run')
+        remote_module.remote_run(project_settings)
         sys.exit()
     num_models = len(model_configs)
     print("\nFit ML models for project: " + project_settings['project_name'])
