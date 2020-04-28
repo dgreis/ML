@@ -184,6 +184,7 @@ class EC2Env(Environment):
 
     def enable_local_port_forwarding(self, workspace):
         # Docker port forwarding
+        instance = workspace['instance']
         bashCommand = "ssh -o StrictHostKeyChecking=no -i ./remote/remote-ml.pem  -N -L 2375:/var/run/docker.sock ubuntu@" + instance.public_dns_name
         forwarding_process = Popen(bashCommand.split(), stdout=PIPE)
         print('Begin local port forwarding so this computer can run remote docker server. Spawned forwarding process, id: ' + str(
