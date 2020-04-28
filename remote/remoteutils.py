@@ -75,33 +75,13 @@ def handle_remote(project_settings):
 
     #Running SSH Commands
     stdin, stdout, stderr = ssh.exec_command('bash ec2bootup.sh')
-    #stdin, stdout, stderr = ssh.exec_command('curl -fsSL https://get.docker.com -o get-docker.sh')
-    #stdin, stdout, stderr = ssh.exec_command('sudo sh get-docker.sh')
 
     #Docker port forwarding
     bashCommand = "ssh -o StrictHostKeyChecking=no -i ./remote/remote-ml.pem  -N -L 2375:/var/run/docker.sock ubuntu@" + instance.public_dns_name
-    #process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     forwarding_process = Popen(bashCommand.split(), stdout=PIPE)
     print('Begin local port forwarding so this computer can run remote docker server. Spawned forwarding process, id: ' + str(forwarding_process.pid))
-    #output, error = process.communicate()
-    #os.environ["DOCKER_HOST"] = "tcp://localhost:2375"
     time.sleep(5)
 
-    # assert 1 == 0
-
-    # #stdin.flush()
-    # data = stdout.read().splitlines()
-    # err = stderr.read().splitlines()
-    # for line in err:
-    #     x = line.decode()
-    #     #print(line.decode())
-    #     print(x)
-    # ssh.close()
-    # assert 1 == 0
-    # 2.1 create docker and run script
-
-
-    #apic = docker.APIClient()
     apic = docker.APIClient(base_url='tcp://localhost:2375')
     Err = True
     Max_tries = 5
@@ -122,16 +102,11 @@ def handle_remote(project_settings):
         c = active_containers[0]
     else:
         print("No active containers found.")
-        # resp = dc.login(username=credentials['DOCKER_USERNAME'],
-        #          password=credentials['DOCKER_PASSWORD']
-        #         )
         progress = apic.pull('dgreis/ml', 'latest', stream=True,
                   auth_config={'username': credentials['DOCKER_USERNAME']
                              , 'password': credentials['DOCKER_PASSWORD']})
         for val in progress:
             print(val.strip())
-        #dc.images.pull('dgreis/ml','latest')
-        #dc = docker.from_env()
         print("Start new docker container")
         c = dc.containers.run('dgreis/ml:latest',
                           environment={
@@ -140,12 +115,6 @@ def handle_remote(project_settings):
                               'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
                           },
                           detach=True)
-        # c = apic.create_container('dgreis/ml:latest',
-        #                           environment={
-        #                             'CURRENT_PROJECT': project_settings['current_project'],
-        #                             'S3_BUCKET': project_settings['remote_settings']['s3_bucket'],
-        #                             'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
-        #                             })
 
     #Add AWS credentials
     working_dir = os.getcwd()
