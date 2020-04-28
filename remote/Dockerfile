@@ -36,18 +36,6 @@ RUN python3 -m pip install -r /tmp/requirements.txt
 #RUN python3 your_libs_directory/setup.py install
 
 # Adding git repos (optional - assuming a setup.py)
-ARG CACHE_DATE=2020-04-22
-
-#TODO: Delete this token so it's not hardcoded and bring it in programmatically somehow
-RUN git clone -b skorch-nn https://dgreis:42d71e99b8b9917f248a85aeabe95883d653a097@github.com/dgreis/ML.git
-
-
-#TODO: These are here now so I don't have to push to git
-COPY ./pullfiles.py /ML/remote/
-COPY ./startup.sh /ML/
-#COPY ./run.py /ML/
-#RUN python3 -m pip install /git_repo
-#RUN python3 git_repo/setup.py install
 ENV AWS_CONFIG_FILE='~/.aws/config'
 
 # Cleanup

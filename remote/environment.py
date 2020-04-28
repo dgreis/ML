@@ -73,7 +73,8 @@ class Environment(object):
                                   environment={
                                       'CURRENT_PROJECT': project_settings['current_project'],
                                       'S3_BUCKET': project_settings['remote_settings']['s3_bucket'],
-                                      'REPO_LOC': project_settings['remote_settings']['remote_repo_loc']
+                                      'REPO_LOC': project_settings['remote_settings']['remote_repo_loc'],
+                                      'GIT_TOKEN': project_settings['GIT_TOKEN']
                                   },
                                   detach=True)
         workspace['container'] = c
