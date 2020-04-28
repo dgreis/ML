@@ -11,6 +11,8 @@ from subprocess import Popen,PIPE
 credentials = yaml.safe_load(open('./remote/credentials.yaml'))
 
 def handle_remote(project_settings):
+
+    print("Program running in remote mode")
     bucket_name = project_settings['remote_settings']['s3_bucket']
     files_to_export = check_for_missing_files(bucket_name, project_settings)
 
@@ -31,10 +33,12 @@ def handle_remote(project_settings):
     ec2 = boto3.resource('ec2', region_name='eu-west-1')
     instances_init = list(ec2.instances.filter(
         Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))
+    print("Checking AWS for instances that are already running")
     if len(instances_init) > 0:
         pass
         #TODO: write logic
     else:
+        print("No running instance found. Spawning a new instance instead")
         ec2.create_instances(ImageId='ami-0f2ed58082cb08a4d'
                              ,MinCount=1, MaxCount=1
                              ,InstanceType='t2.large'
@@ -44,7 +48,10 @@ def handle_remote(project_settings):
                                 {'Ebs': {'VolumeSize': 16},
                                  'DeviceName': '/dev/sda1'
                                 }])
-        time.sleep(60)
+        init_time = 30
+        print("Sleep " + str(init_time) + " seconds while instance initiates")
+        time.sleep(init_time)
+        print("Sleep time over; get to work!")
     instance = list(ec2.instances.filter(
         Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]))[0]
 
@@ -64,6 +71,7 @@ def handle_remote(project_settings):
         sftp.put( os.path.expanduser('~') + '/.aws/' + file, '/home/ubuntu/.aws/' + file)
     sftp.put('./remote/ec2bootup.sh','/home/ubuntu/ec2bootup.sh')
     sftp.close()
+    print("Essential credentials and ec2 boot-up scripts added via SFTP")
 
     #Running SSH Commands
     stdin, stdout, stderr = ssh.exec_command('bash ec2bootup.sh')
@@ -71,12 +79,13 @@ def handle_remote(project_settings):
     #stdin, stdout, stderr = ssh.exec_command('sudo sh get-docker.sh')
 
     #Docker port forwarding
-    bashCommand = "ssh -i ./remote/remote-ml.pem  -N -L 2375:/var/run/docker.sock ubuntu@" + instance.public_dns_name
+    bashCommand = "ssh -o StrictHostKeyChecking=no -i ./remote/remote-ml.pem  -N -L 2375:/var/run/docker.sock ubuntu@" + instance.public_dns_name
     #process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     forwarding_process = Popen(bashCommand.split(), stdout=PIPE)
-    print('spawned forwarding process, id: ' + str(forwarding_process.pid))
+    print('Begin local port forwarding so this computer can run remote docker server. Spawned forwarding process, id: ' + str(forwarding_process.pid))
     #output, error = process.communicate()
     #os.environ["DOCKER_HOST"] = "tcp://localhost:2375"
+    time.sleep(5)
 
     # assert 1 == 0
 
@@ -94,11 +103,25 @@ def handle_remote(project_settings):
 
     #apic = docker.APIClient()
     apic = docker.APIClient(base_url='tcp://localhost:2375')
-    dc = docker.from_env(environment={'DOCKER_HOST': 'tcp://localhost:2375'})
-    active_containers = dc.containers.list()
+    Err = True
+    Max_tries = 5
+    i = 0
+    interval = 10
+    print("Attempt Max: " + str(Max_tries) + " times to establish tunnel docker client")
+    while Err and i <= Max_tries:
+        try:
+            dc = docker.from_env(environment={'DOCKER_HOST': 'tcp://localhost:2375'})
+            active_containers = dc.containers.list()
+            Err = False
+        except Exception:
+            print("Attempt #" + str(i) + " to instantiate tunnel docker client failed. Try again in "+ str(interval) +  " seconds")
+            time.sleep(10)
+            i += 1
+    print("Client connection established after " + str(i) + "attempts. Now checking for active docker containers")
     if len(active_containers) > 0:
         c = active_containers[0]
     else:
+        print("No active containers found.")
         # resp = dc.login(username=credentials['DOCKER_USERNAME'],
         #          password=credentials['DOCKER_PASSWORD']
         #         )
@@ -109,6 +132,7 @@ def handle_remote(project_settings):
             print(val.strip())
         #dc.images.pull('dgreis/ml','latest')
         #dc = docker.from_env()
+        print("Start new docker container")
         c = dc.containers.run('dgreis/ml:latest',
                           environment={
                               'CURRENT_PROJECT': project_settings['current_project'],
@@ -138,12 +162,14 @@ def handle_remote(project_settings):
     data = open('./test' + '.tar', 'rb').read()
     c.put_archive(dst, data)
     os.chdir(working_dir)
+    print("credentials loaded into docker container. Now run program")
 
     cmds = ["/bin/sh", "-c", 'cd $REPO_LOC && bash startup.sh']
     exe = apic.exec_create(container=c.id, cmd=cmds)
     exe_start = apic.exec_start(exec_id=exe, stream=True)
     for val in exe_start:
         print(val.strip())
+    forwarding_process.kill()
 
 def exists_remote(sftp_client, path):
     try:
