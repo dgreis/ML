@@ -1,3 +1,5 @@
+import inspect
+
 import pandas as pd
 import yaml
 import os
@@ -136,3 +138,8 @@ def finalize_manipulations(model_config, project_settings):
     manipulations = preprocess_manipulations + model_config['feature_settings']['manipulations']
     model_config['feature_settings']['manipulations'] = manipulations
     return model_config
+
+def get_args(class_, method):
+    target = getattr(class_,method)
+    args = getattr(inspect.getargspec(target),'args')
+    return args[1:]

@@ -7,6 +7,7 @@ import pandas as pd
 
 from feature.engineering import Cleaner, HorizontalTransformer
 from feature.manipulator import ManipulatorChain, Manipulator
+from utils import get_args
 
 
 class TransformChain(ManipulatorChain):
@@ -72,7 +73,7 @@ class TransformChain(ManipulatorChain):
                             X_dev, y_dev = le.remove_leaking_indices(X_mat, y)
                     else:
                         X_dev, y_dev = X_mat, y
-                    cf_args = self._get_args(transformer_class, 'configure_features')
+                    cf_args = get_args(transformer_class, 'configure_features')
                     cf_kwargs = dict()
                     for arg in cf_args:
                         cf_kwargs[arg] = eval(arg)
@@ -85,19 +86,19 @@ class TransformChain(ManipulatorChain):
                         if issubclass(transformer.__class__, HorizontalTransformer):
                             X_rel, y_dev = X_mat, y
                             transformer.update_touch_indices(X_mat)
-                split_args = self._get_args(transformer_class, 'split')
+                split_args = get_args(transformer_class, 'split')
                 additional_args = filter(lambda x: x not in ['X_mat','y'], split_args)
                 spkwargs = dict()
                 for arg in additional_args:
                     spkwargs[arg] = eval(arg)
                 X_touch, X_untouched, y_touch, y_untouched = transformer.split(X_mat, y,**spkwargs)
-                transform_args = self._get_args(transformer_class, 'transform')
+                transform_args = get_args(transformer_class, 'transform')
                 additional_args = filter(lambda x: x not in ['X_touch','y_touch'], transform_args)
                 tfkwargs = dict()
                 for arg in additional_args:
                    tfkwargs[arg] = eval(arg)
                 X_touched, y_touched = transformer.transform(X_touch, y_touch,**tfkwargs)
-                combine_args = self._get_args(transformer_class, 'combine')
+                combine_args = get_args(transformer_class, 'combine')
                 additional_args = filter(lambda x: x not in ['X_touched','X_untouched','y_touched','y_untouched'],combine_args)
                 cmkwargs = dict()
                 for arg in additional_args:

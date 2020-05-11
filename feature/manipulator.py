@@ -1,4 +1,3 @@
-import inspect
 import pandas as pd
 import os
 import importlib
@@ -126,7 +125,3 @@ class ManipulatorChain(Manipulator):
     def load_prior_features(self):
         raise NotImplementedError
     
-    def _get_args(self, class_, method):
-        target = getattr(class_,method)
-        args = getattr(inspect.getargspec(target),'args')
-        return args[1:]

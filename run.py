@@ -1,7 +1,8 @@
 from __future__ import print_function
 
 import fractions
-import copy
+import importlib
+import sys
 
 from utils import *
 from evaluation import *
@@ -23,8 +24,11 @@ def main():
     project_settings['working_files'] = project_settings['clean_input_files'].copy()
 
     model_configs = load_model_configs(project_settings)['Models']
+    if project_settings['remote_settings']['remote_deploy']:
+        remote_module = importlib.import_module('remote.run')
+        remote_module.remote_run(project_settings)
+        sys.exit()
     num_models = len(model_configs)
-
     print("\nFit ML models for project: " + project_settings['project_name'])
     print( "Number of models to fit: " + str(num_models))
     i = 1
